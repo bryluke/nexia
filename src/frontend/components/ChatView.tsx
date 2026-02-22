@@ -9,6 +9,7 @@ interface Props {
   onSend: (text: string) => void;
   onInterrupt: () => void;
   onArchive: () => void;
+  onPermissionResponse: (permissionId: string, approved: boolean) => void;
   connected: boolean;
   status: string | null;
   isQuerying: boolean;
@@ -22,6 +23,7 @@ export function ChatView({
   onSend,
   onInterrupt,
   onArchive,
+  onPermissionResponse,
   connected,
   status,
   isQuerying,
@@ -124,7 +126,11 @@ export function ChatView({
           </div>
         )}
         {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
+          <MessageBubble
+            key={msg.id}
+            message={msg}
+            onPermissionResponse={onPermissionResponse}
+          />
         ))}
         <div ref={messagesEndRef} />
       </div>

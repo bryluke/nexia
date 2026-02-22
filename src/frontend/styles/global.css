@@ -520,6 +520,79 @@ input, textarea { font: inherit; }
   margin: 0;
 }
 
+/* === Permission Card === */
+.perm-card {
+  margin: 0.375rem 0;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  border-left: 3px solid #fbbf24;
+  background: rgba(15, 23, 42, 0.5);
+  overflow: hidden;
+}
+.perm-card.perm-pending { border-left-color: #fbbf24; }
+.perm-card.perm-approved { border-left-color: #4ade80; }
+.perm-card.perm-denied { border-left-color: #f87171; }
+
+.perm-header {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.8rem;
+}
+.perm-status-icon { font-size: 0.75rem; }
+.perm-icon-pending { color: #fbbf24; }
+.perm-icon-approved { color: #4ade80; }
+.perm-icon-denied { color: #f87171; }
+.perm-name { font-weight: 600; color: #cbd5e1; }
+.perm-summary {
+  flex: 1;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "SF Mono", "Fira Code", Menlo, Consolas, monospace;
+}
+
+.perm-spinner {
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 2px solid #334155;
+  border-top-color: #fbbf24;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+
+.perm-details { border-top: 1px solid #1e293b; }
+
+.perm-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  border-top: 1px solid #1e293b;
+}
+.perm-btn {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+.perm-btn-approve {
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.3);
+}
+.perm-btn-approve:hover { background: rgba(74, 222, 128, 0.25); }
+.perm-btn-deny {
+  background: rgba(248, 113, 113, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}
+.perm-btn-deny:hover { background: rgba(248, 113, 113, 0.25); }
+
 /* === Responsive === */
 @media (min-width: 768px) {
   .sidebar {

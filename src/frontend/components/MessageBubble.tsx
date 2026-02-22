@@ -4,6 +4,7 @@ import hljs from "highlight.js";
 import type { ChatMessageItem } from "../types.ts";
 import { ThinkingBlock } from "./ThinkingBlock.tsx";
 import { ToolUseCard } from "./ToolUseCard.tsx";
+import { PermissionCard } from "./PermissionCard.tsx";
 
 marked.setOptions({
   breaks: true,
@@ -33,9 +34,10 @@ function renderMarkdown(text: string): string {
 
 interface Props {
   message: ChatMessageItem;
+  onPermissionResponse?: (permissionId: string, approved: boolean) => void;
 }
 
-export function MessageBubble({ message }: Props) {
+export function MessageBubble({ message, onPermissionResponse }: Props) {
   const isUser = message.role === "user";
   const hasBlocks = !isUser && message.contentBlocks && message.contentBlocks.length > 0;
 
@@ -77,6 +79,14 @@ export function MessageBubble({ message }: Props) {
                 return <ThinkingBlock key={i} thinking={block.thinking} />;
               case "tool_use":
                 return <ToolUseCard key={block.id} block={block} />;
+              case "permission_request":
+                return (
+                  <PermissionCard
+                    key={block.id}
+                    block={block}
+                    onRespond={onPermissionResponse || (() => {})}
+                  />
+                );
             }
           })}
           {message.pending && <span class="typing-cursor" />}

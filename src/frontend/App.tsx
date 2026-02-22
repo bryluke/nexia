@@ -25,6 +25,7 @@ export function App() {
     getMessages,
     addUserMessage,
     handleServerMessage,
+    updatePermissionStatus,
     loadMessages,
     clearMessages,
     status,
@@ -98,6 +99,17 @@ export function App() {
     send({ type: "archive", conversationId: activeConvId });
   };
 
+  const handlePermissionResponse = (permissionId: string, approved: boolean) => {
+    if (!activeConvId) return;
+    updatePermissionStatus(activeConvId, permissionId, approved);
+    send({
+      type: "permission_response",
+      conversationId: activeConvId,
+      permissionId,
+      approved,
+    });
+  };
+
   const handleCreate = async () => {
     const conv = await createConversation();
     if (conv) setActiveConvId(conv.id);
@@ -161,6 +173,7 @@ export function App() {
         onSend={handleSend}
         onInterrupt={handleInterrupt}
         onArchive={handleArchive}
+        onPermissionResponse={handlePermissionResponse}
         connected={connected}
         status={status}
         isQuerying={activeQuery === activeConvId}

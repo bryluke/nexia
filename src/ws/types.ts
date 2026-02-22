@@ -17,7 +17,14 @@ export interface ArchiveMessage {
   conversationId: string;
 }
 
-export type ClientMessage = ChatMessage | InterruptMessage | ArchiveMessage;
+export interface PermissionResponseMessage {
+  type: "permission_response";
+  conversationId: string;
+  permissionId: string;
+  approved: boolean;
+}
+
+export type ClientMessage = ChatMessage | InterruptMessage | ArchiveMessage | PermissionResponseMessage;
 
 // Server → Client messages
 export interface TextDeltaMessage {
@@ -87,6 +94,14 @@ export interface ToolUseResultMessage {
   isError: boolean;
 }
 
+export interface PermissionRequestMessage {
+  type: "permission_request";
+  conversationId: string;
+  permissionId: string;
+  toolName: string;
+  input: Record<string, unknown>;
+}
+
 export type ServerMessage =
   | TextDeltaMessage
   | AssistantMessage
@@ -97,4 +112,5 @@ export type ServerMessage =
   | SummaryReadyMessage
   | ThinkingDeltaMessage
   | ToolUseStartMessage
-  | ToolUseResultMessage;
+  | ToolUseResultMessage
+  | PermissionRequestMessage;

@@ -54,7 +54,7 @@ src/
     App.tsx              # Root layout (sidebar + chat)
     types.ts             # Shared frontend types
     styles/global.css    # Tailwind
-    components/          # Sidebar, ChatView, MessageBubble, StatusIndicator, ThinkingBlock, ToolUseCard
+    components/          # Sidebar, ChatView, MessageBubble, StatusIndicator, ThinkingBlock, ToolUseCard, PermissionCard
     hooks/               # useWebSocket, useConversations, useChat
 
 public/
@@ -65,8 +65,8 @@ data/                    # SQLite DB (gitignored)
 
 ## WebSocket Protocol
 
-Client → Server: `{ type: 'chat' | 'interrupt' | 'archive', conversationId, message? }`
-Server → Client: `{ type: 'text_delta' | 'assistant_message' | 'result' | 'status' | 'error' | 'archived' | 'summary_ready' | 'thinking_delta' | 'tool_use_start' | 'tool_use_result', conversationId, ... }`
+Client → Server: `{ type: 'chat' | 'interrupt' | 'archive' | 'permission_response', conversationId, ... }`
+Server → Client: `{ type: 'text_delta' | 'assistant_message' | 'result' | 'status' | 'error' | 'archived' | 'summary_ready' | 'thinking_delta' | 'tool_use_start' | 'tool_use_result' | 'permission_request', conversationId, ... }`
 
 ## REST API
 
@@ -79,6 +79,12 @@ All require `Authorization: Bearer <token>` except health.
 | POST | `/api/conversations` | Create conversation |
 | DELETE | `/api/conversations/:id` | Delete conversation |
 | GET | `/api/conversations/:id/messages` | Get message history |
+
+## SDK Documentation
+
+See `docs/sdk-internals.md` for deep-dive notes on the Claude Agent SDK's internal
+architecture, the `canUseTool` permission flow, known Zod schema quirks, and debugging
+tips. Essential reading before modifying anything in `sdk/manager.ts`.
 
 ## Future Considerations
 

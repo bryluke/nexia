@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "preact/hooks";
 import type { ChatMessageItem, ServerMessage, ContentBlock } from "../types.ts";
-import type { ToolUseBlock } from "../../shared/content-blocks.ts";
+import type { ToolUseBlock, PermissionRequestBlock } from "../../shared/content-blocks.ts";
 
 export function useChat() {
   // Messages keyed by conversationId
@@ -97,19 +97,31 @@ export function useChat() {
       }
 
       case "tool_use_start": {
-        const newBlock: ToolUseBlock = {
-          type: "tool_use",
-          id: msg.toolUseId,
-          name: msg.toolName,
-          input: msg.input,
-          status: "running",
-        };
-
         setMessagesByConv((prev) => {
           const msgs = prev[convId] || [];
           const { updated, pendingIdx } = getOrCreatePending(msgs, convId);
           const pending = updated[pendingIdx]!;
-          const blocks = [...(pending.contentBlocks || []), newBlock];
+          const blocks = [...(pending.contentBlocks || [])];
+
+          // Check if this tool already has a card (enrichment from content_block_stop)
+          const existingIdx = blocks.findIndex(
+            (b) => b.type === "tool_use" && b.id === msg.toolUseId
+          );
+          if (existingIdx !== -1) {
+            // Enrich existing block with input data
+            const existing = blocks[existingIdx] as ToolUseBlock;
+            blocks[existingIdx] = { ...existing, input: msg.input ?? existing.input };
+          } else {
+            // New tool card
+            blocks.push({
+              type: "tool_use",
+              id: msg.toolUseId,
+              name: msg.toolName,
+              input: msg.input,
+              status: "running",
+            });
+          }
+
           updated[pendingIdx] = { ...pending, contentBlocks: blocks };
           return { ...prev, [convId]: updated };
         });
@@ -139,6 +151,25 @@ export function useChat() {
               break;
             }
           }
+          return { ...prev, [convId]: updated };
+        });
+        break;
+      }
+
+      case "permission_request": {
+        setMessagesByConv((prev) => {
+          const msgs = prev[convId] || [];
+          const { updated, pendingIdx } = getOrCreatePending(msgs, convId);
+          const pending = updated[pendingIdx]!;
+          const blocks = [...(pending.contentBlocks || [])];
+          blocks.push({
+            type: "permission_request",
+            id: msg.permissionId,
+            toolName: msg.toolName,
+            input: msg.input,
+            status: "pending",
+          });
+          updated[pendingIdx] = { ...pending, contentBlocks: blocks };
           return { ...prev, [convId]: updated };
         });
         break;
@@ -214,6 +245,34 @@ export function useChat() {
     }
   }, []);
 
+  const updatePermissionStatus = useCallback(
+    (convId: string, permissionId: string, approved: boolean) => {
+      setMessagesByConv((prev) => {
+        const msgs = prev[convId] || [];
+        const updated = [...msgs];
+        for (let i = updated.length - 1; i >= 0; i--) {
+          const m = updated[i]!;
+          if (!m.contentBlocks) continue;
+          const blockIdx = m.contentBlocks.findIndex(
+            (b) => b.type === "permission_request" && b.id === permissionId
+          );
+          if (blockIdx !== -1) {
+            const blocks = [...m.contentBlocks];
+            const block = blocks[blockIdx] as PermissionRequestBlock;
+            blocks[blockIdx] = {
+              ...block,
+              status: approved ? "approved" : "denied",
+            };
+            updated[i] = { ...m, contentBlocks: blocks };
+            break;
+          }
+        }
+        return { ...prev, [convId]: updated };
+      });
+    },
+    []
+  );
+
   const loadMessages = useCallback(
     async (conversationId: string, token: string) => {
       // Skip if already loaded
@@ -264,6 +323,7 @@ export function useChat() {
     getMessages,
     addUserMessage,
     handleServerMessage,
+    updatePermissionStatus,
     loadMessages,
     clearMessages,
     status,

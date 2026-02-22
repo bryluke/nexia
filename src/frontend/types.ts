@@ -34,4 +34,5 @@ export type ServerMessage =
   | { type: "summary_ready"; conversationId: string; summary: string }
   | { type: "thinking_delta"; conversationId: string; text: string }
   | { type: "tool_use_start"; conversationId: string; toolUseId: string; toolName: string; input: unknown }
-  | { type: "tool_use_result"; conversationId: string; toolUseId: string; result: string; isError: boolean };
+  | { type: "tool_use_result"; conversationId: string; toolUseId: string; result: string; isError: boolean }
+  | { type: "permission_request"; conversationId: string; permissionId: string; toolName: string; input: Record<string, unknown> };

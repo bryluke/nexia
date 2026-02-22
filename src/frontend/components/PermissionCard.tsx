@@ -1,8 +1,9 @@
 import { useState } from "preact/hooks";
-import type { ToolUseBlock } from "../../shared/content-blocks.ts";
+import type { PermissionRequestBlock } from "../../shared/content-blocks.ts";
 
 interface Props {
-  block: ToolUseBlock;
+  block: PermissionRequestBlock;
+  onRespond: (permissionId: string, approved: boolean) => void;
 }
 
 function summarizeToolInput(toolName: string, input: unknown): string {
@@ -12,7 +13,6 @@ function summarizeToolInput(toolName: string, input: unknown): string {
   switch (toolName) {
     case "Read":
     case "Write":
-      return typeof obj.file_path === "string" ? obj.file_path : "";
     case "Edit":
       return typeof obj.file_path === "string" ? obj.file_path : "";
     case "Bash":
@@ -34,36 +34,34 @@ function summarizeToolInput(toolName: string, input: unknown): string {
   }
 }
 
-function statusIcon(status: ToolUseBlock["status"]): string {
+function statusIcon(status: PermissionRequestBlock["status"]): string {
   switch (status) {
-    case "running": return "\u25CB";
-    case "completed": return "\u2713";
-    case "error": return "\u2717";
-    default: return "\u25CB";
+    case "pending": return "\u25CB";
+    case "approved": return "\u2713";
+    case "denied": return "\u2717";
   }
 }
 
-export function ToolUseCard({ block }: Props) {
+export function PermissionCard({ block, onRespond }: Props) {
   const [inputExpanded, setInputExpanded] = useState(false);
-  const [resultExpanded, setResultExpanded] = useState(false);
 
-  const summary = summarizeToolInput(block.name, block.input);
+  const summary = summarizeToolInput(block.toolName, block.input);
 
   return (
-    <div class={`tool-card tool-${block.status}`}>
-      <div class="tool-header">
-        <span class={`tool-status-icon tool-icon-${block.status}`}>
+    <div class={`perm-card perm-${block.status}`}>
+      <div class="perm-header">
+        <span class={`perm-status-icon perm-icon-${block.status}`}>
           {statusIcon(block.status)}
         </span>
-        <span class="tool-name">{block.name}</span>
-        {summary && <span class="tool-summary">{summary}</span>}
-        {block.status === "running" && (
-          <span class="tool-spinner" />
+        <span class="perm-name">{block.toolName}</span>
+        {summary && <span class="perm-summary">{summary}</span>}
+        {block.status === "pending" && (
+          <span class="perm-spinner" />
         )}
       </div>
 
       {block.input != null && (
-        <div class="tool-details">
+        <div class="perm-details">
           <button
             class="tool-expand-btn"
             onClick={() => setInputExpanded(!inputExpanded)}
@@ -80,21 +78,22 @@ export function ToolUseCard({ block }: Props) {
         </div>
       )}
 
-      {block.result !== undefined && (
-        <div class="tool-details">
+      {block.status === "pending" && (
+        <div class="perm-actions">
           <button
-            class="tool-expand-btn"
-            onClick={() => setResultExpanded(!resultExpanded)}
+            class="perm-btn perm-btn-approve"
+            onClick={() => onRespond(block.id, true)}
             type="button"
           >
-            <span class={`thinking-arrow${resultExpanded ? " expanded" : ""}`}>
-              &#9654;
-            </span>
-            Result
+            Approve
           </button>
-          {resultExpanded && (
-            <pre class="tool-result">{block.result}</pre>
-          )}
+          <button
+            class="perm-btn perm-btn-deny"
+            onClick={() => onRespond(block.id, false)}
+            type="button"
+          >
+            Deny
+          </button>
         </div>
       )}
     </div>

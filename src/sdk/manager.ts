@@ -1,4 +1,4 @@
-import { query, type Query } from "@anthropic-ai/claude-agent-sdk";
+import { query, type Query, type PermissionResult } from "@anthropic-ai/claude-agent-sdk";
 import {
   getConversation,
   updateConversationSessionId,
@@ -15,6 +15,27 @@ import type { ContentBlock } from "../shared/content-blocks.ts";
 type SendFn = (msg: ServerMessage) => void;
 
 const activeQueries = new Map<string, Query>();
+
+// Pending permission requests awaiting user approval
+const pendingPermissions = new Map<string, {
+  resolve: (result: PermissionResult) => void;
+  conversationId: string;
+  input: Record<string, unknown>;
+}>();
+
+export function resolvePermission(permissionId: string, approved: boolean): boolean {
+  const entry = pendingPermissions.get(permissionId);
+  if (!entry) return false;
+  pendingPermissions.delete(permissionId);
+  if (approved) {
+    // Must pass updatedInput — the CLI's Zod schema requires it (not optional).
+    // Pass back the original input so the tool runs with unchanged parameters.
+    entry.resolve({ behavior: "allow", updatedInput: entry.input });
+  } else {
+    entry.resolve({ behavior: "deny", message: "User denied permission" });
+  }
+  return true;
+}
 
 export function isQueryActive(conversationId: string): boolean {
   return activeQueries.has(conversationId);
@@ -63,7 +84,22 @@ You are a Claude Code instance running inside **Nexia**, a web UI that wraps the
 - The user may need to restart Nexia and refresh the browser after source changes
 - See \`CLAUDE.md\` in the Nexia project root for structure and conventions`,
       },
-      permissionMode: "acceptEdits" as const,
+      permissionMode: "default" as const,
+      canUseTool: async (toolName, input, options) => {
+        const permissionId = options.toolUseID;
+
+        send({
+          type: "permission_request",
+          conversationId,
+          permissionId,
+          toolName,
+          input,
+        });
+
+        return new Promise<PermissionResult>((resolve) => {
+          pendingPermissions.set(permissionId, { resolve, conversationId, input });
+        });
+      },
       includePartialMessages: true,
       env: {
         ...process.env,
@@ -95,6 +131,9 @@ You are a Claude Code instance running inside **Nexia**, a web UI that wraps the
     let sessionCaptured = false;
 
     for await (const msg of q) {
+      // Debug: log every SDK message type (remove after verifying tool_use flow)
+      console.log(`[SDK] ${msg.type}${msg.type === "stream_event" ? ` → ${(msg.event as any).type}${(msg.event as any).delta?.type ? ` (${(msg.event as any).delta.type})` : ""}` : ""}`);
+
       // Capture session_id from the first message
       if (!sessionCaptured && "session_id" in msg && msg.session_id) {
         updateConversationSessionId.run(
@@ -157,14 +196,28 @@ You are a Claude Code instance running inside **Nexia**, a web UI that wraps the
               }
               const toolUseId = block?.id || `tool-${idx}`;
               const toolName = block?.name || "unknown";
-              pendingToolUses.set(toolUseId, { name: toolName, input });
-              send({
-                type: "tool_use_start",
-                conversationId,
-                toolUseId,
-                toolName,
-                input,
-              });
+
+              if (!pendingToolUses.has(toolUseId)) {
+                // First time seeing this tool — send start
+                pendingToolUses.set(toolUseId, { name: toolName, input });
+                send({
+                  type: "tool_use_start",
+                  conversationId,
+                  toolUseId,
+                  toolName,
+                  input,
+                });
+              } else {
+                // Already created from tool_progress — enrich with input
+                pendingToolUses.set(toolUseId, { name: toolName, input });
+                send({
+                  type: "tool_use_start",
+                  conversationId,
+                  toolUseId,
+                  toolName,
+                  input,
+                });
+              }
               inputJsonAccumulators.delete(idx);
               blockStarts.delete(idx);
             }
@@ -231,10 +284,25 @@ You are a Claude Code instance running inside **Nexia**, a web UI that wraps the
         }
 
         case "tool_progress": {
+          const toolUseId = (msg as any).tool_use_id as string | undefined;
+          const toolName = msg.tool_name;
+
+          // Create tool card on first progress event for this tool
+          if (toolUseId && !pendingToolUses.has(toolUseId)) {
+            pendingToolUses.set(toolUseId, { name: toolName, input: null });
+            send({
+              type: "tool_use_start",
+              conversationId,
+              toolUseId,
+              toolName,
+              input: null,
+            });
+          }
+
           send({
             type: "status",
             conversationId,
-            status: `Using ${msg.tool_name}...`,
+            status: `Using ${toolName}...`,
           });
           break;
         }
@@ -328,6 +396,14 @@ You are a Claude Code instance running inside **Nexia**, a web UI that wraps the
   } finally {
     activeQueries.delete(conversationId);
     touchConversation.run(conversationId);
+
+    // Auto-deny any pending permissions for this conversation
+    for (const [id, entry] of pendingPermissions) {
+      if (entry.conversationId === conversationId) {
+        entry.resolve({ behavior: "deny", message: "Query ended" });
+        pendingPermissions.delete(id);
+      }
+    }
   }
 }
 

@@ -17,4 +17,12 @@ export interface ToolUseBlock {
   result?: string;
 }
 
-export type ContentBlock = TextBlock | ThinkingBlock | ToolUseBlock;
+export interface PermissionRequestBlock {
+  type: "permission_request";
+  id: string;
+  toolName: string;
+  input: unknown;
+  status: "pending" | "approved" | "denied";
+}
+
+export type ContentBlock = TextBlock | ThinkingBlock | ToolUseBlock | PermissionRequestBlock;
