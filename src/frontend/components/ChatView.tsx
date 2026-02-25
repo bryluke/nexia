@@ -1,8 +1,43 @@
+import type { Ref } from "preact";
 import { useRef, useEffect, useState, useMemo } from "preact/hooks";
 import { marked } from "marked";
 import type { ChatMessageItem, Conversation } from "../types.ts";
 import { MessageBubble } from "./MessageBubble.tsx";
 import { StatusIndicator } from "./StatusIndicator.tsx";
+
+const SHORTCUTS = [
+  { keys: "Ctrl+N", desc: "New conversation" },
+  { keys: "Ctrl+L", desc: "Focus input" },
+  { keys: "Ctrl+/", desc: "Toggle sidebar" },
+  { keys: "Esc", desc: "Stop query" },
+];
+
+function ShortcutsLegend() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div class="shortcuts-wrap">
+      <button
+        class="btn-shortcuts"
+        onClick={() => setOpen((p) => !p)}
+        title="Keyboard shortcuts"
+      >?</button>
+      {open && (
+        <>
+          <div class="shortcuts-backdrop" onClick={() => setOpen(false)} />
+          <div class="shortcuts-popover">
+            <div class="shortcuts-title">Keyboard Shortcuts</div>
+            {SHORTCUTS.map((s) => (
+              <div class="shortcuts-row" key={s.keys}>
+                <kbd class="shortcuts-kbd">{s.keys}</kbd>
+                <span>{s.desc}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 interface Props {
   messages: ChatMessageItem[];
@@ -16,6 +51,7 @@ interface Props {
   hasConversation: boolean;
   conversation: Conversation | null;
   onOpenSidebar: () => void;
+  inputRef?: Ref<HTMLTextAreaElement>;
 }
 
 export function ChatView({
@@ -30,10 +66,12 @@ export function ChatView({
   hasConversation,
   conversation,
   onOpenSidebar,
+  inputRef,
 }: Props) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fallbackRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = inputRef || fallbackRef;
 
   const isArchived = conversation?.status === "archived";
   const supportsFieldSizing = typeof CSS !== "undefined" && CSS.supports("field-sizing", "content");
@@ -100,6 +138,7 @@ export function ChatView({
             </button>
           )
         )}
+        <ShortcutsLegend />
       </div>
 
       {/* Summary banner for archived conversations */}

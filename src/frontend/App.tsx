@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "preact/hooks";
+import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { ChatView } from "./components/ChatView.tsx";
 import { useWebSocket } from "./hooks/useWebSocket.ts";
@@ -127,6 +127,36 @@ export function App() {
     ? conversations.find((c) => c.id === activeConvId) ?? null
     : null;
 
+  const chatInputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Ctrl+N — new conversation
+      if ((e.ctrlKey || e.metaKey) && e.key === "n") {
+        e.preventDefault();
+        handleCreate();
+      }
+      // Ctrl+L — focus input
+      if ((e.ctrlKey || e.metaKey) && e.key === "l") {
+        e.preventDefault();
+        chatInputRef.current?.focus();
+      }
+      // Ctrl+/ — toggle sidebar
+      if ((e.ctrlKey || e.metaKey) && e.key === "/") {
+        e.preventDefault();
+        setSidebarOpen((prev) => !prev);
+      }
+      // Escape — stop active query
+      if (e.key === "Escape" && activeQuery) {
+        e.preventDefault();
+        send({ type: "interrupt", conversationId: activeQuery });
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [activeQuery, send]);
+
   // Token entry screen
   if (!token) {
     return (
@@ -180,6 +210,7 @@ export function App() {
         hasConversation={!!activeConvId}
         conversation={activeConversation}
         onOpenSidebar={() => setSidebarOpen(true)}
+        inputRef={chatInputRef}
       />
     </div>
   );
