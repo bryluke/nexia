@@ -25,6 +25,7 @@ export function useChat() {
         id: crypto.randomUUID(),
         role: "user",
         content,
+        createdAt: new Date().toISOString(),
       };
       setMessagesByConv((prev) => ({
         ...prev,
@@ -190,6 +191,7 @@ export function useChat() {
               pending: false,
               contentBlocks: msg.contentBlocks || last.contentBlocks,
               pendingThinking: undefined,
+              createdAt: last.createdAt || new Date().toISOString(),
             };
             return { ...prev, [convId]: updated };
           }
@@ -203,6 +205,7 @@ export function useChat() {
                 role: "assistant",
                 content: msg.content,
                 contentBlocks: msg.contentBlocks,
+                createdAt: new Date().toISOString(),
               },
             ],
           };
@@ -216,6 +219,25 @@ export function useChat() {
       }
 
       case "result": {
+        // Attach cost/duration to the last assistant message
+        if (msg.costUsd != null || msg.durationMs != null) {
+          setMessagesByConv((prev) => {
+            const msgs = prev[convId] || [];
+            // Walk backward to find last assistant message
+            for (let i = msgs.length - 1; i >= 0; i--) {
+              if (msgs[i]!.role === "assistant") {
+                const updated = [...msgs];
+                updated[i] = {
+                  ...updated[i]!,
+                  ...(msg.costUsd != null && { costUsd: msg.costUsd }),
+                  ...(msg.durationMs != null && { durationMs: msg.durationMs }),
+                };
+                return { ...prev, [convId]: updated };
+              }
+            }
+            return prev;
+          });
+        }
         setActiveQuery(null);
         setStatus(null);
         pendingTextRef.current[convId] = "";
@@ -283,7 +305,7 @@ export function useChat() {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (!res.ok) return;
-        const msgs: { id: string; role: string; content: string; content_blocks?: string | null }[] =
+        const msgs: { id: string; role: string; content: string; content_blocks?: string | null; created_at?: string }[] =
           await res.json();
         setMessagesByConv((prev) => ({
           ...prev,
@@ -301,6 +323,7 @@ export function useChat() {
               role: m.role as "user" | "assistant",
               content: m.content,
               contentBlocks,
+              createdAt: m.created_at,
             };
           }),
         }));

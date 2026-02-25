@@ -21,6 +21,9 @@ export interface ChatMessageItem {
   pending?: boolean;
   contentBlocks?: ContentBlock[];
   pendingThinking?: string;
+  costUsd?: number;
+  durationMs?: number;
+  createdAt?: string;
 }
 
 // Server → Client WS messages

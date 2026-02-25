@@ -36,6 +36,7 @@ export function ChatView({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isArchived = conversation?.status === "archived";
+  const supportsFieldSizing = typeof CSS !== "undefined" && CSS.supports("field-sizing", "content");
 
   const summaryHtml = useMemo(() => {
     if (!conversation?.summary) return null;
@@ -153,7 +154,14 @@ export function ChatView({
             <textarea
               ref={textareaRef}
               value={input}
-              onInput={(e) => setInput((e.target as HTMLTextAreaElement).value)}
+              onInput={(e) => {
+                const ta = e.target as HTMLTextAreaElement;
+                setInput(ta.value);
+                if (!supportsFieldSizing) {
+                  ta.style.height = "auto";
+                  ta.style.height = ta.scrollHeight + "px";
+                }
+              }}
               onKeyDown={handleKeyDown}
               placeholder="Message Nexia..."
               rows={1}

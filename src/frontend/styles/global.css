@@ -313,6 +313,20 @@ input, textarea { font: inherit; }
   border-bottom-left-radius: 0.375rem;
 }
 .msg-bubble.pending { opacity: 0.9; }
+
+/* Message meta (timestamps, cost/duration) */
+.msg-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.375rem;
+  margin-top: 0.25rem;
+  font-size: 0.675rem;
+  color: #64748b;
+}
+.msg-bubble.user .msg-meta { color: rgba(255,255,255,0.55); }
+.msg-time { opacity: 0.8; }
+.msg-cost { opacity: 0.8; }
 .typing-cursor {
   display: inline-block;
   width: 0.375rem;
@@ -347,16 +361,66 @@ input, textarea { font: inherit; }
   overflow-x: auto;
 }
 
+.code-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 0.35em;
+}
+
 .prose pre .code-lang {
-  position: absolute;
-  top: 0.4em;
-  right: 0.6em;
+  margin-right: auto;
   font-size: 0.65em;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #475569;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  pointer-events: none;
+}
+
+/* Code block copy button */
+.copy-btn {
+  padding: 0.15em 0.5em;
+  font-size: 0.7em;
+  color: #64748b;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.prose pre:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { color: #e2e8f0; background: #334155; }
+.copy-btn.copied { color: #4ade80; opacity: 1; }
+
+/* Message copy button */
+.msg-bubble.assistant { position: relative; }
+.msg-copy-btn {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  padding: 0.25rem;
+  color: #64748b;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid #334155;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+.msg-bubble.assistant:hover .msg-copy-btn { opacity: 1; }
+.msg-copy-btn:hover { color: #e2e8f0; }
+.msg-copy-btn.copied { color: #4ade80; opacity: 1; }
+
+/* Touch devices: always show copy buttons */
+@media (hover: none) {
+  .copy-btn { opacity: 1; }
+  .msg-copy-btn { opacity: 1; }
 }
 
 .prose pre code {
