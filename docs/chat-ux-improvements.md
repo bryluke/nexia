@@ -11,12 +11,12 @@ Tracking polish work to bring Nexia's chat experience closer to Claude Code pari
 
 ## Medium Effort / Big UX Lift
 
-- [ ] **Input history** — up/down arrow to cycle through previous messages
-- [ ] **Flat message layout** — replace bubble style with full-width linear layout for assistant messages (better for code blocks and tool output)
-- [ ] **Conversation title auto-generation** — auto-title from first message if not already implemented
+- ~~**Input history** — up/down arrow to cycle through previous messages~~ *(skipped — not useful in a multiline textarea)*
+- [x] **Flat message layout** — full-width subtle background strip for assistant messages, user messages stay as bubbles
+- [x] **Conversation title auto-generation** — already implemented in `manager.ts:275-281`, sets title from first user message
 
 ## Polish
 
 - [x] **Message timestamps** — relative time on all messages, extracted from DB or set at creation
 - [ ] **Keyboard shortcuts** — Ctrl+N new conversation, Ctrl+L clear, etc.
-- [ ] **Better empty state** — starter prompts or suggestions
+- ~~**Better empty state** — starter prompts or suggestions~~ *(skipped — not needed)*
