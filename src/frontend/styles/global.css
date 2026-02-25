@@ -308,9 +308,12 @@ input, textarea { font: inherit; }
   white-space: pre-wrap;
 }
 .msg-bubble.assistant {
-  background: #334155;
+  max-width: 100%;
+  width: 100%;
+  background: rgba(51, 65, 85, 0.25);
   color: #e2e8f0;
-  border-bottom-left-radius: 0.375rem;
+  border-radius: 0;
+  padding: 0.75rem 1rem;
 }
 .msg-bubble.pending { opacity: 0.9; }
 
@@ -666,7 +669,7 @@ input, textarea { font: inherit; }
   .sidebar-overlay { display: none; }
   .chat-topbar-menu { display: none; }
   .chat-empty-mobile-btn { display: none; }
-  .msg-bubble { max-width: 70%; }
+  .msg-bubble.user { max-width: 70%; }
 }
 @media (max-width: 767px) {
   .chat-topbar-menu { display: block; }
