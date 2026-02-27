@@ -1,6 +1,6 @@
 import type { ServerWebSocket } from "bun";
 import type { ClientMessage, ServerMessage } from "./types.ts";
-import { startQuery, interruptQuery, archiveConversation, resolvePermission } from "../sdk/manager.ts";
+import { startQuery, interruptQuery, archiveConversation, resolvePermission, resolveUserInput } from "../sdk/manager.ts";
 
 export interface WSData {
   token: string;
@@ -60,6 +60,11 @@ export function handleWsMessage(
     case "permission_response":
       if (!msg.permissionId) return;
       resolvePermission(msg.permissionId, msg.approved);
+      break;
+
+    case "user_input_response":
+      if (!msg.requestId || !msg.answers) return;
+      resolveUserInput(msg.requestId, msg.answers);
       break;
 
     default:

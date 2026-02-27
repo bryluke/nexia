@@ -1,4 +1,5 @@
 import { homedir } from "node:os";
+import { existsSync, statSync } from "node:fs";
 import { authenticateRequest } from "./auth.ts";
 import {
   listConversations,
@@ -8,6 +9,7 @@ import {
   listMessages,
   deleteMessages,
 } from "../db/index.ts";
+import { cleanupSession } from "../sdk/manager.ts";
 
 function json(data: unknown, status = 200): Response {
   return Response.json(data, { status });
@@ -19,10 +21,24 @@ export function handleListConversations(req: Request): Response {
   return json(conversations);
 }
 
-export function handleCreateConversation(req: Request): Response {
+export async function handleCreateConversation(req: Request): Promise<Response> {
   if (!authenticateRequest(req)) return json({ error: "Unauthorized" }, 401);
+
+  let cwd = homedir();
+  try {
+    const body = await req.json();
+    if (body?.cwd && typeof body.cwd === "string") {
+      const requested = body.cwd;
+      if (existsSync(requested) && statSync(requested).isDirectory()) {
+        cwd = requested;
+      }
+    }
+  } catch {
+    // No body or invalid JSON — use default
+  }
+
   const id = crypto.randomUUID();
-  insertConversation.run(id, "New conversation", homedir());
+  insertConversation.run(id, "New conversation", cwd);
   const conversation = getConversation.get(id);
   return json(conversation, 201);
 }
@@ -34,6 +50,8 @@ export function handleDeleteConversation(
   if (!authenticateRequest(req)) return json({ error: "Unauthorized" }, 401);
   const conversation = getConversation.get(id);
   if (!conversation) return json({ error: "Not found" }, 404);
+  // Clean up .claude session files before deleting
+  cleanupSession(conversation.session_id, conversation.cwd);
   deleteMessages.run(id);
   deleteConversation.run(id);
   return json({ ok: true });

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { ChatView } from "./components/ChatView.tsx";
+import { DirectoryPicker } from "./components/DirectoryPicker.tsx";
 import { useWebSocket } from "./hooks/useWebSocket.ts";
 import { useConversations } from "./hooks/useConversations.ts";
 import { useChat } from "./hooks/useChat.ts";
@@ -11,10 +12,14 @@ export function App() {
   );
   const [tokenInput, setTokenInput] = useState("");
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => window.innerWidth >= 768
+  );
+  const [showPicker, setShowPicker] = useState(false);
 
   const {
     conversations,
+    loading,
     fetchConversations,
     createConversation,
     deleteConversation,
@@ -26,8 +31,10 @@ export function App() {
     addUserMessage,
     handleServerMessage,
     updatePermissionStatus,
+    updateUserInputStatus,
     loadMessages,
     clearMessages,
+    clearActiveQuery,
     status,
     activeQuery,
   } = useChat();
@@ -57,6 +64,15 @@ export function App() {
   );
 
   const { send, connected } = useWebSocket(token, onWsMessage);
+
+  // Clear activeQuery on disconnect
+  const prevConnected = useRef(connected);
+  useEffect(() => {
+    if (prevConnected.current && !connected) {
+      clearActiveQuery();
+    }
+    prevConnected.current = connected;
+  }, [connected, clearActiveQuery]);
 
   // Fetch conversations on auth
   useEffect(() => {
@@ -110,9 +126,28 @@ export function App() {
     });
   };
 
-  const handleCreate = async () => {
-    const conv = await createConversation();
+  const handleUserInputResponse = (requestId: string, answers: Record<string, string>) => {
+    if (!activeConvId) return;
+    updateUserInputStatus(activeConvId, requestId, answers);
+    send({
+      type: "user_input_response",
+      requestId,
+      answers,
+    });
+  };
+
+  const handleNewClick = () => {
+    setShowPicker(true);
+  };
+
+  const handlePickerSelect = async (cwd: string) => {
+    setShowPicker(false);
+    const conv = await createConversation(cwd);
     if (conv) setActiveConvId(conv.id);
+  };
+
+  const handlePickerCancel = () => {
+    setShowPicker(false);
   };
 
   const handleDelete = async (id: string) => {
@@ -135,7 +170,7 @@ export function App() {
       // Ctrl+N — new conversation
       if ((e.ctrlKey || e.metaKey) && e.key === "n") {
         e.preventDefault();
-        handleCreate();
+        handleNewClick();
       }
       // Ctrl+L — focus input
       if ((e.ctrlKey || e.metaKey) && e.key === "l") {
@@ -147,15 +182,20 @@ export function App() {
         e.preventDefault();
         setSidebarOpen((prev) => !prev);
       }
-      // Escape — stop active query
-      if (e.key === "Escape" && activeQuery) {
-        e.preventDefault();
-        send({ type: "interrupt", conversationId: activeQuery });
+      // Escape — stop active query or close picker
+      if (e.key === "Escape") {
+        if (showPicker) {
+          e.preventDefault();
+          setShowPicker(false);
+        } else if (activeQuery) {
+          e.preventDefault();
+          send({ type: "interrupt", conversationId: activeQuery });
+        }
       }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [activeQuery, send]);
+  }, [activeQuery, send, showPicker]);
 
   // Token entry screen
   if (!token) {
@@ -193,8 +233,10 @@ export function App() {
         conversations={conversations}
         activeId={activeConvId}
         onSelect={setActiveConvId}
-        onCreate={handleCreate}
+        onCreate={handleNewClick}
         onDelete={handleDelete}
+        onLogout={handleLogout}
+        loading={loading}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
@@ -204,6 +246,7 @@ export function App() {
         onInterrupt={handleInterrupt}
         onArchive={handleArchive}
         onPermissionResponse={handlePermissionResponse}
+        onUserInputResponse={handleUserInputResponse}
         connected={connected}
         status={status}
         isQuerying={activeQuery === activeConvId}
@@ -212,6 +255,12 @@ export function App() {
         onOpenSidebar={() => setSidebarOpen(true)}
         inputRef={chatInputRef}
       />
+      {showPicker && (
+        <DirectoryPicker
+          onSelect={handlePickerSelect}
+          onCancel={handlePickerCancel}
+        />
+      )}
     </div>
   );
 }

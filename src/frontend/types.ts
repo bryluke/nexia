@@ -19,6 +19,7 @@ export interface ChatMessageItem {
   role: "user" | "assistant";
   content: string;
   pending?: boolean;
+  isError?: boolean;
   contentBlocks?: ContentBlock[];
   pendingThinking?: string;
   costUsd?: number;
@@ -38,4 +39,7 @@ export type ServerMessage =
   | { type: "thinking_delta"; conversationId: string; text: string }
   | { type: "tool_use_start"; conversationId: string; toolUseId: string; toolName: string; input: unknown }
   | { type: "tool_use_result"; conversationId: string; toolUseId: string; result: string; isError: boolean }
-  | { type: "permission_request"; conversationId: string; permissionId: string; toolName: string; input: Record<string, unknown> };
+  | { type: "tool_use_progress"; conversationId: string; toolUseId: string; progress: string }
+  | { type: "permission_request"; conversationId: string; permissionId: string; toolName: string; input: Record<string, unknown> }
+  | { type: "user_input_request"; conversationId: string; requestId: string; questions: Array<{ question: string; header?: string; options: Array<{ label: string; description?: string }>; multiSelect?: boolean }> }
+  | { type: "active_queries"; conversationIds: string[] };

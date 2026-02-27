@@ -1,3 +1,6 @@
+import { resolve, join } from "node:path";
+import { homedir } from "node:os";
+import { rmSync, existsSync } from "node:fs";
 import { query, type Query, type PermissionResult } from "@anthropic-ai/claude-agent-sdk";
 import {
   getConversation,
@@ -23,6 +26,41 @@ const pendingPermissions = new Map<string, {
   input: Record<string, unknown>;
 }>();
 
+// Pending user input requests (AskUserQuestion)
+const pendingUserInputs = new Map<string, {
+  resolve: (answers: Record<string, string>) => void;
+  conversationId: string;
+}>();
+
+/**
+ * Clean up .claude session files for a conversation.
+ * Session files live at ~/.claude/projects/<project-hash>/<session-id>.jsonl
+ * and optionally a same-named directory.
+ */
+export function cleanupSession(sessionId: string | null, cwd: string): void {
+  if (!sessionId) return;
+
+  // Project hash: cwd with leading / removed and remaining / → -
+  const projectHash = "-" + cwd.slice(1).replace(/\//g, "-");
+  const projectDir = join(homedir(), ".claude", "projects", projectHash);
+
+  const jsonlPath = join(projectDir, `${sessionId}.jsonl`);
+  const dirPath = join(projectDir, sessionId);
+
+  try {
+    if (existsSync(jsonlPath)) {
+      rmSync(jsonlPath);
+      console.log(`[Cleanup] Removed session file: ${jsonlPath}`);
+    }
+    if (existsSync(dirPath)) {
+      rmSync(dirPath, { recursive: true });
+      console.log(`[Cleanup] Removed session dir: ${dirPath}`);
+    }
+  } catch (err: any) {
+    console.error(`[Cleanup] Failed to clean session ${sessionId}: ${err.message}`);
+  }
+}
+
 export function resolvePermission(permissionId: string, approved: boolean): boolean {
   const entry = pendingPermissions.get(permissionId);
   if (!entry) return false;
@@ -37,8 +75,20 @@ export function resolvePermission(permissionId: string, approved: boolean): bool
   return true;
 }
 
+export function resolveUserInput(requestId: string, answers: Record<string, string>): boolean {
+  const entry = pendingUserInputs.get(requestId);
+  if (!entry) return false;
+  pendingUserInputs.delete(requestId);
+  entry.resolve(answers);
+  return true;
+}
+
 export function isQueryActive(conversationId: string): boolean {
   return activeQueries.has(conversationId);
+}
+
+export function getActiveQueryIds(): string[] {
+  return [...activeQueries.keys()];
 }
 
 export async function startQuery(
@@ -57,15 +107,41 @@ export async function startQuery(
   }
 
   if (activeQueries.has(conversationId)) {
-    send({
-      type: "error",
-      conversationId,
-      message: "A query is already active for this conversation",
-    });
-    return;
+    // Interrupt the stale query (e.g. from a disconnected session) and wait for cleanup
+    console.log(`[SDK] Interrupting stale query for ${conversationId}`);
+    interruptQuery(conversationId);
+    // Give the old query a moment to clean up
+    await new Promise((r) => setTimeout(r, 500));
+    // If it's still hanging, force-remove it
+    if (activeQueries.has(conversationId)) {
+      console.log(`[SDK] Force-removing stuck query for ${conversationId}`);
+      activeQueries.delete(conversationId);
+    }
   }
 
   const isFirstMessage = !conversation.session_id;
+
+  // Build system prompt append — inject project CLAUDE.md if it exists
+  let systemAppend = `# Nexia Context
+
+You are a Claude Code instance running inside **Nexia**, a web UI that wraps the Claude Agent SDK. The user is chatting with you through Nexia's browser interface, not the CLI directly.
+
+- Working directory: \`${conversation.cwd}\`
+- You have full Claude Code tools (file ops, bash, search, subagents, etc.)
+- Nexia's source code is at \`${process.cwd()}\` — you can read and edit it
+- The user may need to restart Nexia and refresh the browser after source changes`;
+
+  // Try to read CLAUDE.md from the conversation's working directory
+  const claudeMdPath = resolve(conversation.cwd, "CLAUDE.md");
+  try {
+    const claudeMdFile = Bun.file(claudeMdPath);
+    if (await claudeMdFile.exists()) {
+      const claudeMdContent = await claudeMdFile.text();
+      systemAppend += `\n\n# Project CLAUDE.md (from ${conversation.cwd})\n\n${claudeMdContent}`;
+    }
+  } catch {
+    // CLAUDE.md doesn't exist or can't be read — skip
+  }
 
   const queryOptions: Parameters<typeof query>[0] = {
     prompt: message,
@@ -75,18 +151,34 @@ export async function startQuery(
       systemPrompt: {
         type: "preset" as const,
         preset: "claude_code" as const,
-        append: `# Nexia Context
-
-You are a Claude Code instance running inside **Nexia**, a web UI that wraps the Claude Agent SDK. The user is chatting with you through Nexia's browser interface, not the CLI directly.
-
-- You have full Claude Code tools (file ops, bash, search, subagents, etc.)
-- Nexia's source code is at \`${process.cwd()}\` — you can read and edit it
-- The user may need to restart Nexia and refresh the browser after source changes
-- See \`CLAUDE.md\` in the Nexia project root for structure and conventions`,
+        append: systemAppend,
       },
       permissionMode: "default" as const,
       canUseTool: async (toolName, input, options) => {
         const permissionId = options.toolUseID;
+
+        // Special handling for AskUserQuestion — collect answers from frontend
+        if (toolName === "AskUserQuestion") {
+          const questions = (input as any).questions;
+          if (Array.isArray(questions)) {
+            send({
+              type: "user_input_request",
+              conversationId,
+              requestId: permissionId,
+              questions,
+            });
+
+            const answers = await new Promise<Record<string, string>>((resolve) => {
+              pendingUserInputs.set(permissionId, { resolve, conversationId });
+            });
+
+            // Return allow with answers pre-filled in the input
+            return {
+              behavior: "allow" as const,
+              updatedInput: { ...input, answers },
+            };
+          }
+        }
 
         send({
           type: "permission_request",
@@ -286,6 +378,7 @@ You are a Claude Code instance running inside **Nexia**, a web UI that wraps the
         case "tool_progress": {
           const toolUseId = (msg as any).tool_use_id as string | undefined;
           const toolName = msg.tool_name;
+          const elapsed = (msg as any).elapsed_time_seconds as number | undefined;
 
           // Create tool card on first progress event for this tool
           if (toolUseId && !pendingToolUses.has(toolUseId)) {
@@ -296,6 +389,17 @@ You are a Claude Code instance running inside **Nexia**, a web UI that wraps the
               toolUseId,
               toolName,
               input: null,
+            });
+          }
+
+          // Send progress with elapsed time to the tool card
+          const elapsedStr = elapsed != null ? `${Math.round(elapsed)}s` : "";
+          if (toolUseId) {
+            send({
+              type: "tool_use_progress",
+              conversationId,
+              toolUseId,
+              progress: elapsedStr ? `Running... ${elapsedStr}` : `Running...`,
             });
           }
 
@@ -379,6 +483,7 @@ You are a Claude Code instance running inside **Nexia**, a web UI that wraps the
       errorMsg.includes("session") ||
       errorMsg.includes("ENOENT");
     if (isSessionGone && conversation.session_id) {
+      cleanupSession(conversation.session_id, conversation.cwd);
       markArchived.run(conversationId);
       send({
         type: "archived",
@@ -404,6 +509,13 @@ You are a Claude Code instance running inside **Nexia**, a web UI that wraps the
         pendingPermissions.delete(id);
       }
     }
+    // Auto-resolve any pending user inputs with empty answers
+    for (const [id, entry] of pendingUserInputs) {
+      if (entry.conversationId === conversationId) {
+        entry.resolve({});
+        pendingUserInputs.delete(id);
+      }
+    }
   }
 }
 
@@ -427,6 +539,9 @@ export async function archiveConversation(
     send({ type: "error", conversationId, message: "Already archived" });
     return;
   }
+
+  // Clean up .claude session files
+  cleanupSession(conversation.session_id, conversation.cwd);
 
   // Mark archived immediately
   markArchived.run(conversationId);

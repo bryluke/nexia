@@ -5,6 +5,7 @@ import type { ChatMessageItem } from "../types.ts";
 import { ThinkingBlock } from "./ThinkingBlock.tsx";
 import { ToolUseCard } from "./ToolUseCard.tsx";
 import { PermissionCard } from "./PermissionCard.tsx";
+import { UserInputCard } from "./UserInputCard.tsx";
 
 marked.setOptions({
   breaks: true,
@@ -116,9 +117,10 @@ function MsgMeta({ message }: { message: ChatMessageItem }) {
 interface Props {
   message: ChatMessageItem;
   onPermissionResponse?: (permissionId: string, approved: boolean) => void;
+  onUserInputResponse?: (requestId: string, answers: Record<string, string>) => void;
 }
 
-export function MessageBubble({ message, onPermissionResponse }: Props) {
+export function MessageBubble({ message, onPermissionResponse, onUserInputResponse }: Props) {
   const isUser = message.role === "user";
   const hasBlocks = !isUser && message.contentBlocks && message.contentBlocks.length > 0;
 
@@ -134,6 +136,24 @@ export function MessageBubble({ message, onPermissionResponse }: Props) {
         <div class="msg-bubble user">
           {message.content}
           <MsgMeta message={message} />
+        </div>
+      </div>
+    );
+  }
+
+  // Error message
+  if (message.isError) {
+    return (
+      <div class="msg-row assistant">
+        <div class="msg-bubble assistant error">
+          <span class="error-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+          </span>
+          {message.content}
         </div>
       </div>
     );
@@ -169,6 +189,14 @@ export function MessageBubble({ message, onPermissionResponse }: Props) {
                     key={block.id}
                     block={block}
                     onRespond={onPermissionResponse || (() => {})}
+                  />
+                );
+              case "user_input":
+                return (
+                  <UserInputCard
+                    key={block.id}
+                    block={block}
+                    onRespond={onUserInputResponse || (() => {})}
                   />
                 );
             }

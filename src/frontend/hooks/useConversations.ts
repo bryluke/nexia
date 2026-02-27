@@ -24,11 +24,16 @@ export function useConversations(token: string | null) {
     }
   }, [token]);
 
-  const createConversation = useCallback(async (): Promise<Conversation | null> => {
+  const createConversation = useCallback(async (cwd?: string): Promise<Conversation | null> => {
     if (!token) return null;
+    const headers: HeadersInit = {
+      ...authHeaders(token),
+      "Content-Type": "application/json",
+    };
     const res = await fetch("/api/conversations", {
       method: "POST",
-      headers: authHeaders(token),
+      headers,
+      body: JSON.stringify({ cwd }),
     });
     if (!res.ok) return null;
     const conv: Conversation = await res.json();

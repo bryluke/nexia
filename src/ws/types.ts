@@ -24,7 +24,13 @@ export interface PermissionResponseMessage {
   approved: boolean;
 }
 
-export type ClientMessage = ChatMessage | InterruptMessage | ArchiveMessage | PermissionResponseMessage;
+export interface UserInputResponseMessage {
+  type: "user_input_response";
+  requestId: string;
+  answers: Record<string, string>;
+}
+
+export type ClientMessage = ChatMessage | InterruptMessage | ArchiveMessage | PermissionResponseMessage | UserInputResponseMessage;
 
 // Server → Client messages
 export interface TextDeltaMessage {
@@ -102,6 +108,30 @@ export interface PermissionRequestMessage {
   input: Record<string, unknown>;
 }
 
+export interface UserInputRequestMessage {
+  type: "user_input_request";
+  conversationId: string;
+  requestId: string;
+  questions: Array<{
+    question: string;
+    header?: string;
+    options: Array<{ label: string; description?: string }>;
+    multiSelect?: boolean;
+  }>;
+}
+
+export interface ToolUseProgressMessage {
+  type: "tool_use_progress";
+  conversationId: string;
+  toolUseId: string;
+  progress: string;
+}
+
+export interface ActiveQueriesMessage {
+  type: "active_queries";
+  conversationIds: string[];
+}
+
 export type ServerMessage =
   | TextDeltaMessage
   | AssistantMessage
@@ -113,4 +143,7 @@ export type ServerMessage =
   | ThinkingDeltaMessage
   | ToolUseStartMessage
   | ToolUseResultMessage
-  | PermissionRequestMessage;
+  | ToolUseProgressMessage
+  | PermissionRequestMessage
+  | UserInputRequestMessage
+  | ActiveQueriesMessage;

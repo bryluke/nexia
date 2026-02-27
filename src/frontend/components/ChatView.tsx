@@ -12,6 +12,13 @@ const SHORTCUTS = [
   { keys: "Esc", desc: "Stop query" },
 ];
 
+function abbreviateCwd(cwd: string | undefined): string | null {
+  if (!cwd) return null;
+  const match = cwd.match(/^\/home\/[^/]+/);
+  if (match) return "~" + cwd.slice(match[0].length);
+  return cwd;
+}
+
 function ShortcutsLegend() {
   const [open, setOpen] = useState(false);
   return (
@@ -45,6 +52,7 @@ interface Props {
   onInterrupt: () => void;
   onArchive: () => void;
   onPermissionResponse: (permissionId: string, approved: boolean) => void;
+  onUserInputResponse: (requestId: string, answers: Record<string, string>) => void;
   connected: boolean;
   status: string | null;
   isQuerying: boolean;
@@ -60,6 +68,7 @@ export function ChatView({
   onInterrupt,
   onArchive,
   onPermissionResponse,
+  onUserInputResponse,
   connected,
   status,
   isQuerying,
@@ -123,9 +132,16 @@ export function ChatView({
             <path d="M3 12h18M3 6h18M3 18h18" />
           </svg>
         </button>
-        <span class="chat-topbar-title">
-          {conversation?.title || "Nexia"}
-        </span>
+        <div class="chat-topbar-title-group" style="flex:1;min-width:0">
+          <span class="chat-topbar-title">
+            {conversation?.title || "Nexia"}
+          </span>
+          {conversation?.cwd && (
+            <div class="chat-topbar-breadcrumb">
+              {abbreviateCwd(conversation.cwd)}
+            </div>
+          )}
+        </div>
         {isArchived ? (
           <span class="archived-badge">Archived</span>
         ) : (
@@ -170,6 +186,7 @@ export function ChatView({
             key={msg.id}
             message={msg}
             onPermissionResponse={onPermissionResponse}
+            onUserInputResponse={onUserInputResponse}
           />
         ))}
         <div ref={messagesEndRef} />

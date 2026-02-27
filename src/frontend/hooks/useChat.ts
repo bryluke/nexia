@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "preact/hooks";
 import type { ChatMessageItem, ServerMessage, ContentBlock } from "../types.ts";
-import type { ToolUseBlock, PermissionRequestBlock } from "../../shared/content-blocks.ts";
+import type { ToolUseBlock, PermissionRequestBlock, UserInputBlock } from "../../shared/content-blocks.ts";
 
 export function useChat() {
   // Messages keyed by conversationId
@@ -60,6 +60,15 @@ export function useChat() {
   }
 
   const handleServerMessage = useCallback((msg: ServerMessage) => {
+    // Handle messages without conversationId first
+    if (msg.type === "active_queries") {
+      // Restore activeQuery state for reconnection (pick the first active one)
+      if (msg.conversationIds.length > 0) {
+        setActiveQuery(msg.conversationIds[0]!);
+      }
+      return;
+    }
+
     const convId = msg.conversationId;
 
     switch (msg.type) {
@@ -71,9 +80,21 @@ export function useChat() {
         setMessagesByConv((prev) => {
           const msgs = prev[convId] || [];
           const { updated, pendingIdx } = getOrCreatePending(msgs, convId);
+          const pending = updated[pendingIdx]!;
+          const blocks = [...(pending.contentBlocks || [])];
+
+          // Append to trailing text block, or create a new one
+          const last = blocks[blocks.length - 1];
+          if (last && last.type === "text") {
+            blocks[blocks.length - 1] = { ...last, text: last.text + msg.text };
+          } else {
+            blocks.push({ type: "text", text: msg.text });
+          }
+
           updated[pendingIdx] = {
-            ...updated[pendingIdx]!,
+            ...pending,
             content: pendingText,
+            contentBlocks: blocks,
           };
           return { ...prev, [convId]: updated };
         });
@@ -157,6 +178,29 @@ export function useChat() {
         break;
       }
 
+      case "tool_use_progress": {
+        setMessagesByConv((prev) => {
+          const msgs = prev[convId] || [];
+          const updated = [...msgs];
+          for (let i = updated.length - 1; i >= 0; i--) {
+            const m = updated[i]!;
+            if (!m.contentBlocks) continue;
+            const blockIdx = m.contentBlocks.findIndex(
+              (b) => b.type === "tool_use" && b.id === msg.toolUseId
+            );
+            if (blockIdx !== -1) {
+              const blocks = [...m.contentBlocks];
+              const block = blocks[blockIdx] as ToolUseBlock;
+              blocks[blockIdx] = { ...block, progress: msg.progress };
+              updated[i] = { ...m, contentBlocks: blocks };
+              break;
+            }
+          }
+          return { ...prev, [convId]: updated };
+        });
+        break;
+      }
+
       case "permission_request": {
         setMessagesByConv((prev) => {
           const msgs = prev[convId] || [];
@@ -168,6 +212,24 @@ export function useChat() {
             id: msg.permissionId,
             toolName: msg.toolName,
             input: msg.input,
+            status: "pending",
+          });
+          updated[pendingIdx] = { ...pending, contentBlocks: blocks };
+          return { ...prev, [convId]: updated };
+        });
+        break;
+      }
+
+      case "user_input_request": {
+        setMessagesByConv((prev) => {
+          const msgs = prev[convId] || [];
+          const { updated, pendingIdx } = getOrCreatePending(msgs, convId);
+          const pending = updated[pendingIdx]!;
+          const blocks = [...(pending.contentBlocks || [])];
+          blocks.push({
+            type: "user_input",
+            id: msg.requestId,
+            questions: msg.questions,
             status: "pending",
           });
           updated[pendingIdx] = { ...pending, contentBlocks: blocks };
@@ -258,7 +320,8 @@ export function useChat() {
             {
               id: crypto.randomUUID(),
               role: "assistant" as const,
-              content: `Error: ${msg.message}`,
+              content: msg.message,
+              isError: true,
             },
           ],
         }));
@@ -295,6 +358,31 @@ export function useChat() {
     []
   );
 
+  const updateUserInputStatus = useCallback(
+    (convId: string, requestId: string, answers: Record<string, string>) => {
+      setMessagesByConv((prev) => {
+        const msgs = prev[convId] || [];
+        const updated = [...msgs];
+        for (let i = updated.length - 1; i >= 0; i--) {
+          const m = updated[i]!;
+          if (!m.contentBlocks) continue;
+          const blockIdx = m.contentBlocks.findIndex(
+            (b) => b.type === "user_input" && b.id === requestId
+          );
+          if (blockIdx !== -1) {
+            const blocks = [...m.contentBlocks];
+            const block = blocks[blockIdx] as UserInputBlock;
+            blocks[blockIdx] = { ...block, status: "answered", answers };
+            updated[i] = { ...m, contentBlocks: blocks };
+            break;
+          }
+        }
+        return { ...prev, [convId]: updated };
+      });
+    },
+    []
+  );
+
   const loadMessages = useCallback(
     async (conversationId: string, token: string) => {
       // Skip if already loaded
@@ -316,6 +404,21 @@ export function useChat() {
                 contentBlocks = JSON.parse(m.content_blocks);
               } catch {
                 // ignore parse errors
+              }
+            }
+            // Mark stale "running" tool blocks as completed (they're historical)
+            if (contentBlocks) {
+              for (let i = 0; i < contentBlocks.length; i++) {
+                const b = contentBlocks[i]!;
+                if (b.type === "tool_use" && b.status === "running") {
+                  contentBlocks[i] = { ...b, status: "completed" };
+                }
+                if (b.type === "permission_request" && b.status === "pending") {
+                  contentBlocks[i] = { ...b, status: "denied" };
+                }
+                if (b.type === "user_input" && b.status === "pending") {
+                  contentBlocks[i] = { ...b, status: "answered" };
+                }
               }
             }
             return {
@@ -342,13 +445,20 @@ export function useChat() {
     });
   }, []);
 
+  const clearActiveQuery = useCallback(() => {
+    setActiveQuery(null);
+    setStatus(null);
+  }, []);
+
   return {
     getMessages,
     addUserMessage,
     handleServerMessage,
     updatePermissionStatus,
+    updateUserInputStatus,
     loadMessages,
     clearMessages,
+    clearActiveQuery,
     status,
     activeQuery,
   };

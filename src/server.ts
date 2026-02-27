@@ -6,7 +6,9 @@ import {
   handleDeleteConversation,
   handleListMessages,
 } from "./api/conversations.ts";
+import { handleFilesystemList } from "./api/filesystem.ts";
 import { handleWsMessage, type WSData } from "./ws/handler.ts";
+import { getActiveQueryIds } from "./sdk/manager.ts";
 
 const PORT = 5101;
 
@@ -34,6 +36,10 @@ const server = Bun.serve<WSData>({
       GET: (req: Request & { params: { id: string } }) =>
         handleListMessages(req, req.params.id),
     },
+
+    "/api/filesystem/list": {
+      GET: (req: Request) => handleFilesystemList(req),
+    },
   },
 
   fetch(req, server) {
@@ -58,6 +64,11 @@ const server = Bun.serve<WSData>({
   websocket: {
     open(ws) {
       console.log("[WS] Client connected");
+      // Notify frontend about any active queries so it can show stop buttons
+      const activeIds = getActiveQueryIds();
+      if (activeIds.length > 0) {
+        ws.send(JSON.stringify({ type: "active_queries", conversationIds: activeIds }));
+      }
     },
     message(ws, message) {
       handleWsMessage(ws, message);

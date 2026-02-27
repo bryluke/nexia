@@ -15,6 +15,7 @@ export interface ToolUseBlock {
   input: unknown;
   status: "running" | "completed" | "error";
   result?: string;
+  progress?: string;
 }
 
 export interface PermissionRequestBlock {
@@ -25,4 +26,19 @@ export interface PermissionRequestBlock {
   status: "pending" | "approved" | "denied";
 }
 
-export type ContentBlock = TextBlock | ThinkingBlock | ToolUseBlock | PermissionRequestBlock;
+export interface UserInputQuestion {
+  question: string;
+  header?: string;
+  options: Array<{ label: string; description?: string }>;
+  multiSelect?: boolean;
+}
+
+export interface UserInputBlock {
+  type: "user_input";
+  id: string;
+  questions: UserInputQuestion[];
+  status: "pending" | "answered";
+  answers?: Record<string, string>;
+}
+
+export type ContentBlock = TextBlock | ThinkingBlock | ToolUseBlock | PermissionRequestBlock | UserInputBlock;
