@@ -20,6 +20,7 @@ import {
   handleListMessages,
 } from "./api/conversations.ts";
 import { handleSystemInfo } from "./api/system.ts";
+import { handleListDirectories } from "./api/directories.ts";
 import { handleWsMessage, type WSData } from "./ws/handler.ts";
 import { getActiveQueryIds } from "./agent/session-store.ts";
 
@@ -57,6 +58,10 @@ const server = Bun.serve<WSData>({
 
     "/api/system": {
       GET: (req: Request) => handleSystemInfo(req),
+    },
+
+    "/api/directories": {
+      GET: (req: Request) => handleListDirectories(req),
     },
   },
 

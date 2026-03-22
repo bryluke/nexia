@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "preact/hooks";
 import { ConversationList } from "../components/chat/ConversationList.tsx";
 import { ChatView } from "../components/chat/ChatView.tsx";
+import { DirectoryPicker } from "../components/chat/DirectoryPicker.tsx";
 import type { Conversation, ChatMessageItem } from "../../shared/types.ts";
 
 interface Props {
@@ -49,6 +50,7 @@ export function ChatPage({
 }: Props) {
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
 
   // Load messages when selecting a conversation
   useEffect(() => {
@@ -57,10 +59,22 @@ export function ChatPage({
     }
   }, [activeConvId, token, loadMessages]);
 
-  const handleNewConversation = useCallback(async () => {
-    const conv = await createConversation();
-    if (conv) setActiveConvId(conv.id);
-  }, [createConversation]);
+  const handleNewClick = useCallback(() => {
+    setShowPicker(true);
+  }, []);
+
+  const handlePickerSelect = useCallback(
+    async (cwd: string) => {
+      setShowPicker(false);
+      const conv = await createConversation(cwd);
+      if (conv) setActiveConvId(conv.id);
+    },
+    [createConversation]
+  );
+
+  const handlePickerCancel = useCallback(() => {
+    setShowPicker(false);
+  }, []);
 
   const handleDelete = useCallback(
     async (id: string) => {
@@ -122,7 +136,12 @@ export function ChatPage({
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "n") {
         e.preventDefault();
-        handleNewConversation();
+        handleNewClick();
+      }
+      if (e.key === "Escape" && showPicker) {
+        e.preventDefault();
+        setShowPicker(false);
+        return;
       }
       if (e.key === "Escape" && activeQuery) {
         e.preventDefault();
@@ -131,7 +150,7 @@ export function ChatPage({
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [activeQuery, send, handleNewConversation]);
+  }, [activeQuery, send, handleNewClick, showPicker]);
 
   const handleSelect = useCallback(
     (id: string) => {
@@ -150,7 +169,7 @@ export function ChatPage({
         conversations={conversations}
         activeId={activeConvId}
         onSelect={handleSelect}
-        onCreate={handleNewConversation}
+        onCreate={handleNewClick}
         onDelete={handleDelete}
         loading={convsLoading}
         open={sidebarOpen}
@@ -182,6 +201,13 @@ export function ChatPage({
         conversation={activeConversation}
       />
       </div>
+      {showPicker && (
+        <DirectoryPicker
+          token={token}
+          onSelect={handlePickerSelect}
+          onCancel={handlePickerCancel}
+        />
+      )}
     </div>
   );
 }
