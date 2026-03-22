@@ -47,6 +47,7 @@ export type ServerMessage =
       conversationId: string;
       content: string;
       contentBlocks?: ContentBlock[];
+      model?: string;
     }
   | {
       type: "result";
@@ -95,6 +96,7 @@ export type ServerMessage =
       questions: UserInputQuestion[];
     }
   | { type: "active_queries"; conversationIds: string[] }
+  | { type: "context_compacted"; conversationId: string; trigger: string }
   | {
       type: "queued";
       conversationId: string;

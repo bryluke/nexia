@@ -270,6 +270,7 @@ export function useChat() {
               contentBlocks: mergedBlocks,
               pendingThinking: undefined,
               createdAt: last.createdAt || new Date().toISOString(),
+              model: msg.model || last.model,
             };
             return { ...prev, [convId]: updated };
           }
@@ -283,6 +284,7 @@ export function useChat() {
                 content: msg.content,
                 contentBlocks: msg.contentBlocks,
                 createdAt: new Date().toISOString(),
+                model: msg.model,
               },
             ],
           };
@@ -303,6 +305,22 @@ export function useChat() {
               createdAt: new Date().toISOString(),
               isQueued: true,
               queuePosition: msg.position,
+            },
+          ],
+        }));
+        break;
+      }
+
+      case "context_compacted": {
+        setMessagesByConv((prev) => ({
+          ...prev,
+          [convId]: [
+            ...(prev[convId] || []),
+            {
+              id: crypto.randomUUID(),
+              role: "assistant" as const,
+              content: `Context compacted (${msg.trigger})`,
+              isCompactionMarker: true,
             },
           ],
         }));

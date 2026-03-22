@@ -76,6 +76,8 @@ export interface ChatMessageItem {
   costUsd?: number;
   durationMs?: number;
   createdAt?: string;
+  model?: string;
   isQueued?: boolean;
   queuePosition?: number;
+  isCompactionMarker?: boolean;
 }

@@ -146,6 +146,7 @@ export async function startQuery(
         }
 
         case "assistant": {
+          const model = (msg.message as any).model as string | undefined;
           const content = msg.message.content;
           let text = "";
           let blocksJson: string | null = null;
@@ -175,6 +176,7 @@ export async function startQuery(
             content: text,
             contentBlocks:
               blocksJson ? JSON.parse(blocksJson) : undefined,
+            model,
           });
 
           parser.resetThinking();
@@ -214,6 +216,19 @@ export async function startQuery(
 
         case "tool_use_summary": {
           parser.handleToolUseSummary(msg as any);
+          break;
+        }
+
+        case "system": {
+          const subtype = (msg as any).subtype;
+          if (subtype === "compact_boundary") {
+            const trigger = (msg as any).compact_metadata?.trigger || "auto";
+            send({
+              type: "context_compacted",
+              conversationId,
+              trigger,
+            });
+          }
           break;
         }
 

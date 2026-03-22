@@ -34,15 +34,24 @@ function MsgCopyButton({ text }: { text: string }) {
   );
 }
 
+function formatModel(model: string): string {
+  if (model.includes("opus")) return "Opus";
+  if (model.includes("sonnet")) return "Sonnet";
+  if (model.includes("haiku")) return "Haiku";
+  return model.replace("claude-", "").replace(/-\d.*$/, "");
+}
+
 function MsgMeta({ message }: { message: ChatMessageItem }) {
   const parts: string[] = [];
   if (message.costUsd != null) parts.push(formatCost(message.costUsd));
   if (message.durationMs != null) parts.push(formatDuration(message.durationMs));
 
-  if (parts.length === 0 && !message.createdAt) return null;
+  const hasModel = !!message.model;
+  if (parts.length === 0 && !message.createdAt && !hasModel) return null;
 
   return (
     <div class="msg-meta">
+      {hasModel && <span class="msg-model">{formatModel(message.model!)}</span>}
       {message.createdAt && (
         <span class="msg-time">{formatTime(message.createdAt)}</span>
       )}
@@ -129,6 +138,23 @@ export function MessageBubble({
   onPermissionResponse,
   onUserInputResponse,
 }: Props) {
+  // Context compaction divider
+  if (message.isCompactionMarker) {
+    return (
+      <div class="compaction-divider">
+        <span class="compaction-line" />
+        <span class="compaction-label">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" />
+            <path d="M20 4L8.12 15.88M14.47 14.48L20 20M8.12 8.12L12 12" />
+          </svg>
+          Context compacted
+        </span>
+        <span class="compaction-line" />
+      </div>
+    );
+  }
+
   const isUser = message.role === "user";
   const hasBlocks =
     !isUser && message.contentBlocks && message.contentBlocks.length > 0;
