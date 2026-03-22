@@ -1,3 +1,16 @@
+// Prevent unhandled errors from crashing the server
+process.on("unhandledRejection", (err) => {
+  console.error("[UNHANDLED REJECTION]", err);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[UNCAUGHT EXCEPTION]", err);
+});
+
+// DB tables are created in connection.ts at import time
+import "./db/connection.ts";
+import { runMigrations } from "./db/migrations.ts";
+runMigrations();
+
 import index from "../public/index.html";
 import { authenticateToken } from "./api/auth.ts";
 import {
@@ -6,9 +19,9 @@ import {
   handleDeleteConversation,
   handleListMessages,
 } from "./api/conversations.ts";
-import { handleFilesystemList } from "./api/filesystem.ts";
+import { handleSystemInfo } from "./api/system.ts";
 import { handleWsMessage, type WSData } from "./ws/handler.ts";
-import { getActiveQueryIds } from "./sdk/manager.ts";
+import { getActiveQueryIds } from "./agent/session-store.ts";
 
 const PORT = 5101;
 
@@ -19,7 +32,12 @@ const server = Bun.serve<WSData>({
     "/": index,
 
     "/api/health": {
-      GET: () => Response.json({ status: "ok", timestamp: new Date().toISOString() }),
+      GET: () =>
+        Response.json({
+          status: "ok",
+          version: "2.0.0",
+          timestamp: new Date().toISOString(),
+        }),
     },
 
     "/api/conversations": {
@@ -37,8 +55,8 @@ const server = Bun.serve<WSData>({
         handleListMessages(req, req.params.id),
     },
 
-    "/api/filesystem/list": {
-      GET: (req: Request) => handleFilesystemList(req),
+    "/api/system": {
+      GET: (req: Request) => handleSystemInfo(req),
     },
   },
 
@@ -64,16 +82,20 @@ const server = Bun.serve<WSData>({
   websocket: {
     open(ws) {
       console.log("[WS] Client connected");
-      // Notify frontend about any active queries so it can show stop buttons
       const activeIds = getActiveQueryIds();
       if (activeIds.length > 0) {
-        ws.send(JSON.stringify({ type: "active_queries", conversationIds: activeIds }));
+        ws.send(
+          JSON.stringify({
+            type: "active_queries",
+            conversationIds: activeIds,
+          })
+        );
       }
     },
     message(ws, message) {
       handleWsMessage(ws, message);
     },
-    close(ws) {
+    close() {
       console.log("[WS] Client disconnected");
     },
   },
@@ -84,4 +106,4 @@ const server = Bun.serve<WSData>({
   },
 });
 
-console.log(`Nexia running at http://localhost:${server.port}`);
+console.log(`Nexia v2 running at http://localhost:${server.port}`);

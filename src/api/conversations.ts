@@ -6,10 +6,9 @@ import {
   getConversation,
   insertConversation,
   deleteConversation,
-  listMessages,
-  deleteMessages,
-} from "../db/index.ts";
-import { cleanupSession } from "../sdk/manager.ts";
+} from "../db/queries/conversations.ts";
+import { listMessages, deleteMessages } from "../db/queries/messages.ts";
+import { cleanupSession } from "../agent/session-store.ts";
 
 function json(data: unknown, status = 200): Response {
   return Response.json(data, { status });
@@ -17,11 +16,12 @@ function json(data: unknown, status = 200): Response {
 
 export function handleListConversations(req: Request): Response {
   if (!authenticateRequest(req)) return json({ error: "Unauthorized" }, 401);
-  const conversations = listConversations.all();
-  return json(conversations);
+  return json(listConversations.all());
 }
 
-export async function handleCreateConversation(req: Request): Promise<Response> {
+export async function handleCreateConversation(
+  req: Request
+): Promise<Response> {
   if (!authenticateRequest(req)) return json({ error: "Unauthorized" }, 401);
 
   let cwd = homedir();
@@ -50,7 +50,6 @@ export function handleDeleteConversation(
   if (!authenticateRequest(req)) return json({ error: "Unauthorized" }, 401);
   const conversation = getConversation.get(id);
   if (!conversation) return json({ error: "Not found" }, 404);
-  // Clean up .claude session files before deleting
   cleanupSession(conversation.session_id, conversation.cwd);
   deleteMessages.run(id);
   deleteConversation.run(id);
@@ -64,6 +63,5 @@ export function handleListMessages(
   if (!authenticateRequest(req)) return json({ error: "Unauthorized" }, 401);
   const conversation = getConversation.get(conversationId);
   if (!conversation) return json({ error: "Not found" }, 404);
-  const messages = listMessages.all(conversationId);
-  return json(messages);
+  return json(listMessages.all(conversationId));
 }

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "Nexia Setup"
-echo "==========="
+echo "Nexia v2 Setup"
+echo "=============="
 echo
 
 # Check for Bun
@@ -41,5 +41,39 @@ else
   echo "You'll need this to log in to the web UI."
 fi
 
+# Create data directory
+mkdir -p data
+
+# Setup systemd service (optional)
 echo
-echo "Setup complete! Run 'bun run dev' to start."
+read -p "Install systemd service? (y/N) " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+  NEXIA_DIR="$(pwd)"
+  SERVICE_FILE="/etc/systemd/system/nexia.service"
+
+  sudo tee "$SERVICE_FILE" > /dev/null <<UNIT
+[Unit]
+Description=Nexia v2 — Dev Machine Management Platform
+After=network.target
+
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=$NEXIA_DIR
+ExecStart=$(which bun) run start
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+  sudo systemctl daemon-reload
+  sudo systemctl enable nexia
+  echo "Service installed. Start with: sudo systemctl start nexia"
+fi
+
+echo
+echo "Setup complete! Run 'bun run dev' to start in dev mode."

@@ -1,5 +1,5 @@
 import { useState, useCallback } from "preact/hooks";
-import type { Conversation } from "../types.ts";
+import type { Conversation } from "../../shared/types.ts";
 
 function authHeaders(token: string): HeadersInit {
   return { Authorization: `Bearer ${token}` };
@@ -24,39 +24,44 @@ export function useConversations(token: string | null) {
     }
   }, [token]);
 
-  const createConversation = useCallback(async (cwd?: string): Promise<Conversation | null> => {
-    if (!token) return null;
-    const headers: HeadersInit = {
-      ...authHeaders(token),
-      "Content-Type": "application/json",
-    };
-    const res = await fetch("/api/conversations", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ cwd }),
-    });
-    if (!res.ok) return null;
-    const conv: Conversation = await res.json();
-    setConversations((prev) => [conv, ...prev]);
-    return conv;
-  }, [token]);
+  const createConversation = useCallback(
+    async (cwd?: string): Promise<Conversation | null> => {
+      if (!token) return null;
+      const res = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { ...authHeaders(token), "Content-Type": "application/json" },
+        body: JSON.stringify({ cwd }),
+      });
+      if (!res.ok) return null;
+      const conv: Conversation = await res.json();
+      setConversations((prev) => [conv, ...prev]);
+      return conv;
+    },
+    [token]
+  );
 
-  const deleteConversation = useCallback(async (id: string) => {
-    if (!token) return;
-    const res = await fetch(`/api/conversations/${id}`, {
-      method: "DELETE",
-      headers: authHeaders(token),
-    });
-    if (res.ok) {
-      setConversations((prev) => prev.filter((c) => c.id !== id));
-    }
-  }, [token]);
+  const deleteConversation = useCallback(
+    async (id: string) => {
+      if (!token) return;
+      const res = await fetch(`/api/conversations/${id}`, {
+        method: "DELETE",
+        headers: authHeaders(token),
+      });
+      if (res.ok) {
+        setConversations((prev) => prev.filter((c) => c.id !== id));
+      }
+    },
+    [token]
+  );
 
-  const updateConversationInList = useCallback((updated: Partial<Conversation> & { id: string }) => {
-    setConversations((prev) =>
-      prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c))
-    );
-  }, []);
+  const updateConversationInList = useCallback(
+    (updated: Partial<Conversation> & { id: string }) => {
+      setConversations((prev) =>
+        prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c))
+      );
+    },
+    []
+  );
 
   return {
     conversations,

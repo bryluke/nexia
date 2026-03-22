@@ -1,17 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
-import type { ServerMessage } from "../types.ts";
 
-type MessageHandler = (msg: ServerMessage) => void;
-
-interface UseWebSocketReturn {
-  send: (data: unknown) => void;
-  connected: boolean;
-}
+type MessageHandler = (msg: any) => void;
 
 export function useWebSocket(
   token: string | null,
   onMessage: MessageHandler
-): UseWebSocketReturn {
+) {
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const retriesRef = useRef(0);
@@ -22,7 +16,9 @@ export function useWebSocket(
     if (!token) return;
 
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${protocol}//${location.host}/ws?token=${token}`);
+    const ws = new WebSocket(
+      `${protocol}//${location.host}/ws?token=${token}`
+    );
 
     ws.onopen = () => {
       setConnected(true);
@@ -31,7 +27,7 @@ export function useWebSocket(
 
     ws.onmessage = (e) => {
       try {
-        const msg = JSON.parse(e.data) as ServerMessage;
+        const msg = JSON.parse(e.data);
         onMessageRef.current(msg);
       } catch {
         // ignore malformed messages
@@ -41,7 +37,6 @@ export function useWebSocket(
     ws.onclose = () => {
       setConnected(false);
       wsRef.current = null;
-      // Exponential backoff reconnect
       const delay = Math.min(1000 * 2 ** retriesRef.current, 30000);
       retriesRef.current++;
       setTimeout(connect, delay);

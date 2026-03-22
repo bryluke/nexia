@@ -1,9 +1,13 @@
 import { useState, useCallback, useRef } from "preact/hooks";
-import type { ChatMessageItem, ServerMessage, ContentBlock } from "../types.ts";
-import type { ToolUseBlock, PermissionRequestBlock, UserInputBlock } from "../../shared/content-blocks.ts";
+import type {
+  ChatMessageItem,
+  ContentBlock,
+  ToolUseBlock,
+  PermissionRequestBlock,
+  UserInputBlock,
+} from "../../shared/types.ts";
 
 export function useChat() {
-  // Messages keyed by conversationId
   const [messagesByConv, setMessagesByConv] = useState<
     Record<string, ChatMessageItem[]>
   >({});
@@ -11,6 +15,8 @@ export function useChat() {
   const [activeQuery, setActiveQuery] = useState<string | null>(null);
   const pendingTextRef = useRef<Record<string, string>>({});
   const pendingThinkingRef = useRef<Record<string, string>>({});
+  // Track resolved tool states to survive state batching races
+  const resolvedToolsRef = useRef<Map<string, { status: "completed" | "error"; result: string }>>(new Map());
 
   const getMessages = useCallback(
     (conversationId: string): ChatMessageItem[] => {
@@ -39,10 +45,9 @@ export function useChat() {
     []
   );
 
-  // Helper: get or create the current pending assistant message
   function getOrCreatePending(
     msgs: ChatMessageItem[],
-    convId: string
+    _convId: string
   ): { updated: ChatMessageItem[]; pendingIdx: number } {
     const last = msgs[msgs.length - 1];
     if (last?.pending && last.role === "assistant") {
@@ -59,17 +64,15 @@ export function useChat() {
     return { updated, pendingIdx: updated.length - 1 };
   }
 
-  const handleServerMessage = useCallback((msg: ServerMessage) => {
-    // Handle messages without conversationId first
+  const handleServerMessage = useCallback((msg: any) => {
     if (msg.type === "active_queries") {
-      // Restore activeQuery state for reconnection (pick the first active one)
       if (msg.conversationIds.length > 0) {
         setActiveQuery(msg.conversationIds[0]!);
       }
       return;
     }
 
-    const convId = msg.conversationId;
+    const convId = msg.conversationId as string;
 
     switch (msg.type) {
       case "text_delta": {
@@ -83,7 +86,6 @@ export function useChat() {
           const pending = updated[pendingIdx]!;
           const blocks = [...(pending.contentBlocks || [])];
 
-          // Append to trailing text block, or create a new one
           const last = blocks[blocks.length - 1];
           if (last && last.type === "text") {
             blocks[blocks.length - 1] = { ...last, text: last.text + msg.text };
@@ -125,16 +127,16 @@ export function useChat() {
           const pending = updated[pendingIdx]!;
           const blocks = [...(pending.contentBlocks || [])];
 
-          // Check if this tool already has a card (enrichment from content_block_stop)
           const existingIdx = blocks.findIndex(
             (b) => b.type === "tool_use" && b.id === msg.toolUseId
           );
           if (existingIdx !== -1) {
-            // Enrich existing block with input data
             const existing = blocks[existingIdx] as ToolUseBlock;
-            blocks[existingIdx] = { ...existing, input: msg.input ?? existing.input };
+            blocks[existingIdx] = {
+              ...existing,
+              input: msg.input ?? existing.input,
+            };
           } else {
-            // New tool card
             blocks.push({
               type: "tool_use",
               id: msg.toolUseId,
@@ -151,9 +153,11 @@ export function useChat() {
       }
 
       case "tool_use_result": {
+        const resolvedStatus = msg.isError ? "error" as const : "completed" as const;
+        resolvedToolsRef.current.set(msg.toolUseId, { status: resolvedStatus, result: msg.result });
+        // Apply immediately to any existing block in state
         setMessagesByConv((prev) => {
           const msgs = prev[convId] || [];
-          // Walk backward to find the message containing this tool use block
           const updated = [...msgs];
           for (let i = updated.length - 1; i >= 0; i--) {
             const m = updated[i]!;
@@ -166,14 +170,15 @@ export function useChat() {
               const block = blocks[blockIdx] as ToolUseBlock;
               blocks[blockIdx] = {
                 ...block,
-                status: msg.isError ? "error" : "completed",
+                status: resolvedStatus,
                 result: msg.result,
               };
               updated[i] = { ...m, contentBlocks: blocks };
-              break;
+              return { ...prev, [convId]: updated };
             }
           }
-          return { ...prev, [convId]: updated };
+          // Block not in state yet — ref will handle it when assistant_message arrives
+          return prev;
         });
         break;
       }
@@ -245,26 +250,36 @@ export function useChat() {
           const msgs = prev[convId] || [];
           const last = msgs[msgs.length - 1];
           if (last?.pending && last.role === "assistant") {
-            // Finalize the pending message
+            // Apply resolved tool states from the ref (survives state batching)
+            let mergedBlocks = msg.contentBlocks || last.contentBlocks;
+            if (mergedBlocks) {
+              mergedBlocks = mergedBlocks.map((block: any) => {
+                if (block.type !== "tool_use") return block;
+                const resolved = resolvedToolsRef.current.get(block.id);
+                if (resolved) {
+                  return { ...block, status: resolved.status, result: resolved.result };
+                }
+                return block;
+              });
+            }
             const updated = [...msgs];
             updated[updated.length - 1] = {
               ...last,
               content: msg.content,
               pending: false,
-              contentBlocks: msg.contentBlocks || last.contentBlocks,
+              contentBlocks: mergedBlocks,
               pendingThinking: undefined,
               createdAt: last.createdAt || new Date().toISOString(),
             };
             return { ...prev, [convId]: updated };
           }
-          // If no pending, add as new
           return {
             ...prev,
             [convId]: [
               ...msgs,
               {
                 id: crypto.randomUUID(),
-                role: "assistant",
+                role: "assistant" as const,
                 content: msg.content,
                 contentBlocks: msg.contentBlocks,
                 createdAt: new Date().toISOString(),
@@ -275,17 +290,52 @@ export function useChat() {
         break;
       }
 
+      case "queued": {
+        // Show queued message as a user message with a "queued" indicator
+        setMessagesByConv((prev) => ({
+          ...prev,
+          [convId]: [
+            ...(prev[convId] || []),
+            {
+              id: msg.messageId,
+              role: "user" as const,
+              content: msg.message,
+              createdAt: new Date().toISOString(),
+              isQueued: true,
+              queuePosition: msg.position,
+            },
+          ],
+        }));
+        break;
+      }
+
+      case "queue_processing": {
+        // Mark the queued message as no longer queued, set it as active
+        setMessagesByConv((prev) => {
+          const msgs = prev[convId] || [];
+          const updated = msgs.map((m) =>
+            (m as any).isQueued && m.content === msg.message
+              ? { ...m, isQueued: false, queuePosition: undefined }
+              : m
+          );
+          return { ...prev, [convId]: updated };
+        });
+        setActiveQuery(convId);
+        setStatus(null);
+        pendingTextRef.current[convId] = "";
+        pendingThinkingRef.current[convId] = "";
+        break;
+      }
+
       case "status": {
         setStatus(msg.status);
         break;
       }
 
       case "result": {
-        // Attach cost/duration to the last assistant message
         if (msg.costUsd != null || msg.durationMs != null) {
           setMessagesByConv((prev) => {
             const msgs = prev[convId] || [];
-            // Walk backward to find last assistant message
             for (let i = msgs.length - 1; i >= 0; i--) {
               if (msgs[i]!.role === "assistant") {
                 const updated = [...msgs];
@@ -312,7 +362,6 @@ export function useChat() {
         setStatus(null);
         pendingTextRef.current[convId] = "";
         pendingThinkingRef.current[convId] = "";
-        // Show error as a system message
         setMessagesByConv((prev) => ({
           ...prev,
           [convId]: [
@@ -385,7 +434,6 @@ export function useChat() {
 
   const loadMessages = useCallback(
     async (conversationId: string, token: string) => {
-      // Skip if already loaded
       if (messagesByConv[conversationId]) return;
       try {
         const res = await fetch(
@@ -393,8 +441,7 @@ export function useChat() {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (!res.ok) return;
-        const msgs: { id: string; role: string; content: string; content_blocks?: string | null; created_at?: string }[] =
-          await res.json();
+        const msgs: any[] = await res.json();
         setMessagesByConv((prev) => ({
           ...prev,
           [conversationId]: msgs.map((m) => {
@@ -403,17 +450,20 @@ export function useChat() {
               try {
                 contentBlocks = JSON.parse(m.content_blocks);
               } catch {
-                // ignore parse errors
+                // ignore
               }
             }
-            // Mark stale "running" tool blocks as completed (they're historical)
+            // Mark stale running blocks as completed
             if (contentBlocks) {
               for (let i = 0; i < contentBlocks.length; i++) {
                 const b = contentBlocks[i]!;
                 if (b.type === "tool_use" && b.status === "running") {
                   contentBlocks[i] = { ...b, status: "completed" };
                 }
-                if (b.type === "permission_request" && b.status === "pending") {
+                if (
+                  b.type === "permission_request" &&
+                  b.status === "pending"
+                ) {
                   contentBlocks[i] = { ...b, status: "denied" };
                 }
                 if (b.type === "user_input" && b.status === "pending") {
@@ -431,7 +481,7 @@ export function useChat() {
           }),
         }));
       } catch {
-        // ignore fetch errors
+        // ignore
       }
     },
     [messagesByConv]

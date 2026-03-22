@@ -1,6 +1,14 @@
 import type { ServerWebSocket } from "bun";
-import type { ClientMessage, ServerMessage } from "./types.ts";
-import { startQuery, interruptQuery, archiveConversation, resolvePermission, resolveUserInput } from "../sdk/manager.ts";
+import type { ClientMessage, ServerMessage } from "./protocol.ts";
+import { startQuery, archiveConversation } from "../agent/engine.ts";
+import {
+  isQueryActive,
+  interruptQuery,
+  resolvePermission,
+  resolveUserInput,
+  enqueueMessage,
+  getQueuedMessages,
+} from "../agent/session-store.ts";
 
 export interface WSData {
   token: string;
@@ -14,11 +22,7 @@ export function handleWsMessage(
   try {
     msg = JSON.parse(typeof raw === "string" ? raw : raw.toString());
   } catch {
-    wsSend(ws, {
-      type: "error",
-      conversationId: "",
-      message: "Invalid JSON",
-    });
+    wsSend(ws, { type: "error", conversationId: "", message: "Invalid JSON" });
     return;
   }
 
@@ -32,10 +36,37 @@ export function handleWsMessage(
         });
         return;
       }
-      // Start query async — responses stream back via send callback
+      // Queue if a query is already running for this conversation
+      if (isQueryActive(msg.conversationId)) {
+        const queued = enqueueMessage(msg.conversationId, msg.message);
+        if (queued) {
+          const queue = getQueuedMessages(msg.conversationId);
+          wsSend(ws, {
+            type: "queued",
+            conversationId: msg.conversationId,
+            messageId: queued.id,
+            message: queued.message,
+            position: queue.length,
+          });
+        } else {
+          wsSend(ws, {
+            type: "error",
+            conversationId: msg.conversationId,
+            message: "Message queue is full",
+          });
+        }
+        return;
+      }
       startQuery(msg.conversationId, msg.message, (serverMsg) =>
         wsSend(ws, serverMsg)
-      );
+      ).catch((err) => {
+        console.error(`[WS] startQuery crashed:`, err);
+        wsSend(ws, {
+          type: "error",
+          conversationId: msg.conversationId,
+          message: err?.message || "Query failed unexpectedly",
+        });
+      });
       break;
 
     case "interrupt":
@@ -54,7 +85,14 @@ export function handleWsMessage(
       if (!msg.conversationId) return;
       archiveConversation(msg.conversationId, (serverMsg) =>
         wsSend(ws, serverMsg)
-      );
+      ).catch((err) => {
+        console.error(`[WS] archiveConversation crashed:`, err);
+        wsSend(ws, {
+          type: "error",
+          conversationId: msg.conversationId,
+          message: err?.message || "Archive failed",
+        });
+      });
       break;
 
     case "permission_response":
@@ -76,10 +114,7 @@ export function handleWsMessage(
   }
 }
 
-function wsSend(
-  ws: ServerWebSocket<WSData>,
-  msg: ServerMessage
-): void {
+function wsSend(ws: ServerWebSocket<WSData>, msg: ServerMessage): void {
   try {
     ws.send(JSON.stringify(msg));
   } catch {
