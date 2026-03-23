@@ -6,8 +6,13 @@ interface Migration {
 }
 
 const migrations: Migration[] = [
-  // Future migrations go here:
-  // { name: "001_add_something", up: () => db.exec("ALTER TABLE ...") },
+  {
+    name: "001_add_permission_mode",
+    up: () =>
+      db.exec(
+        "ALTER TABLE conversations ADD COLUMN permission_mode TEXT NOT NULL DEFAULT 'acceptEdits'"
+      ),
+  },
 ];
 
 export function runMigrations(): void {

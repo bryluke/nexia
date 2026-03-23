@@ -6,21 +6,21 @@ process.on("uncaughtException", (err) => {
   console.error("[UNCAUGHT EXCEPTION]", err);
 });
 
-// DB tables are created in connection.ts at import time
+// DB tables + migrations run in connection.ts at import time
 import "./db/connection.ts";
-import { runMigrations } from "./db/migrations.ts";
-runMigrations();
 
 import index from "../public/index.html";
 import { authenticateToken } from "./api/auth.ts";
 import {
   handleListConversations,
   handleCreateConversation,
+  handleUpdateConversation,
   handleDeleteConversation,
   handleListMessages,
 } from "./api/conversations.ts";
 import { handleSystemInfo } from "./api/system.ts";
 import { handleListDirectories } from "./api/directories.ts";
+import { handleListMemory, handleDeleteMemory } from "./api/memory.ts";
 import { handleWsMessage, type WSData } from "./ws/handler.ts";
 import { getActiveQueryIds } from "./agent/session-store.ts";
 
@@ -47,6 +47,8 @@ const server = Bun.serve<WSData>({
     },
 
     "/api/conversations/:id": {
+      PATCH: (req: Request & { params: { id: string } }) =>
+        handleUpdateConversation(req, req.params.id),
       DELETE: (req: Request & { params: { id: string } }) =>
         handleDeleteConversation(req, req.params.id),
     },
@@ -62,6 +64,15 @@ const server = Bun.serve<WSData>({
 
     "/api/directories": {
       GET: (req: Request) => handleListDirectories(req),
+    },
+
+    "/api/memory": {
+      GET: (req: Request) => handleListMemory(req),
+    },
+
+    "/api/memory/:id": {
+      DELETE: (req: Request & { params: { id: string } }) =>
+        handleDeleteMemory(req, req.params.id),
     },
   },
 

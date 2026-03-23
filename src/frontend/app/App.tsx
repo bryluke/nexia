@@ -3,6 +3,7 @@ import { useRouter } from "./Router.tsx";
 import { Nav } from "../components/layout/Nav.tsx";
 import { ChatPage } from "../pages/ChatPage.tsx";
 import { DashboardPage } from "../pages/DashboardPage.tsx";
+import { MemoryPage } from "../pages/MemoryPage.tsx";
 import { useWebSocket } from "../hooks/useWebSocket.ts";
 import { useConversations } from "../hooks/useConversations.ts";
 import { useChat } from "../hooks/useChat.ts";
@@ -20,6 +21,7 @@ export function App() {
     fetchConversations,
     createConversation,
     deleteConversation,
+    renameConversation,
     updateConversationInList,
   } = useConversations(token);
 
@@ -135,6 +137,7 @@ export function App() {
             fetchConversations={fetchConversations}
             createConversation={createConversation}
             deleteConversation={deleteConversation}
+            renameConversation={renameConversation}
             getMessages={getMessages}
             addUserMessage={addUserMessage}
             updatePermissionStatus={updatePermissionStatus}
@@ -146,8 +149,10 @@ export function App() {
             status={status}
             activeQuery={activeQuery}
           />
-        ) : (
+        ) : route === "dashboard" ? (
           <DashboardPage token={token} />
+        ) : (
+          <MemoryPage token={token} />
         )}
       </main>
     </div>

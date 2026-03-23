@@ -72,4 +72,8 @@ db.exec(`
 db.exec(`CREATE INDEX IF NOT EXISTS idx_memory_kind ON memory(kind)`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_memory_tags ON memory(tags)`);
 
+// Run migrations inline (must happen before query modules prepare statements)
+import { runMigrations } from "./migrations.ts";
+runMigrations();
+
 export { db };

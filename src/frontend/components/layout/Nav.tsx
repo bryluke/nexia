@@ -1,6 +1,6 @@
 interface Props {
   route: string;
-  onNavigate: (to: "chat" | "dashboard") => void;
+  onNavigate: (to: "chat" | "dashboard" | "memory") => void;
   connected: boolean;
   onLogout: () => void;
 }
@@ -24,6 +24,12 @@ export function Nav({ route, onNavigate, connected, onLogout }: Props) {
           onClick={() => onNavigate("dashboard")}
         >
           Dashboard
+        </button>
+        <button
+          class={`nav-link${route === "memory" ? " active" : ""}`}
+          onClick={() => onNavigate("memory")}
+        >
+          Memory
         </button>
       </div>
       <div class="nav-right">

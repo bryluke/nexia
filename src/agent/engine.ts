@@ -58,7 +58,7 @@ export async function startQuery(
         preset: "claude_code" as const,
         append: systemAppend,
       },
-      permissionMode: "acceptEdits" as const,
+      permissionMode: (conversation as any).permission_mode as any || "acceptEdits",
       canUseTool: async (toolName, input, options) => {
         const permissionId = options.toolUseID;
 

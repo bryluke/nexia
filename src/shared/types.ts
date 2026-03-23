@@ -60,6 +60,7 @@ export interface Conversation {
   status: string;
   summary: string | null;
   tags: string | null;
+  permission_mode: string;
   archived_at: string | null;
   created_at: string;
   updated_at: string;

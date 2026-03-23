@@ -54,6 +54,23 @@ export function useConversations(token: string | null) {
     [token]
   );
 
+  const renameConversation = useCallback(
+    async (id: string, title: string) => {
+      if (!token) return;
+      const res = await fetch(`/api/conversations/${id}`, {
+        method: "PATCH",
+        headers: { ...authHeaders(token), "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      if (res.ok) {
+        setConversations((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, title } : c))
+        );
+      }
+    },
+    [token]
+  );
+
   const updateConversationInList = useCallback(
     (updated: Partial<Conversation> & { id: string }) => {
       setConversations((prev) =>
@@ -69,6 +86,7 @@ export function useConversations(token: string | null) {
     fetchConversations,
     createConversation,
     deleteConversation,
+    renameConversation,
     updateConversationInList,
   };
 }

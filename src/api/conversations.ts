@@ -6,6 +6,8 @@ import {
   getConversation,
   insertConversation,
   deleteConversation,
+  updateConversationTitle,
+  updatePermissionMode,
 } from "../db/queries/conversations.ts";
 import { listMessages, deleteMessages } from "../db/queries/messages.ts";
 import { cleanupSession } from "../agent/session-store.ts";
@@ -41,6 +43,39 @@ export async function handleCreateConversation(
   insertConversation.run(id, "New conversation", cwd);
   const conversation = getConversation.get(id);
   return json(conversation, 201);
+}
+
+const VALID_PERMISSION_MODES = ["default", "acceptEdits", "bypassPermissions"];
+
+export async function handleUpdateConversation(
+  req: Request,
+  id: string
+): Promise<Response> {
+  if (!authenticateRequest(req)) return json({ error: "Unauthorized" }, 401);
+  const conversation = getConversation.get(id);
+  if (!conversation) return json({ error: "Not found" }, 404);
+  try {
+    const body = await req.json();
+    const updates: Record<string, string> = {};
+
+    if (body?.title && typeof body.title === "string" && body.title.trim()) {
+      updateConversationTitle.run(body.title.trim(), id);
+      updates.title = body.title.trim();
+    }
+
+    if (body?.permission_mode && VALID_PERMISSION_MODES.includes(body.permission_mode)) {
+      updatePermissionMode.run(body.permission_mode, id);
+      updates.permission_mode = body.permission_mode;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return json({ error: "No valid fields to update" }, 400);
+    }
+
+    return json({ ...conversation, ...updates });
+  } catch {
+    return json({ error: "Invalid request body" }, 400);
+  }
 }
 
 export function handleDeleteConversation(

@@ -11,6 +11,7 @@ interface Props {
   fetchConversations: () => Promise<void>;
   createConversation: (cwd?: string) => Promise<Conversation | null>;
   deleteConversation: (id: string) => Promise<void>;
+  renameConversation: (id: string, title: string) => Promise<void>;
   getMessages: (id: string) => ChatMessageItem[];
   addUserMessage: (id: string, content: string) => void;
   updatePermissionStatus: (
@@ -35,8 +36,10 @@ export function ChatPage({
   token,
   conversations,
   convsLoading,
+  fetchConversations,
   createConversation,
   deleteConversation,
+  renameConversation,
   getMessages,
   addUserMessage,
   updatePermissionStatus,
@@ -103,6 +106,22 @@ export function ChatPage({
     if (!activeConvId) return;
     send({ type: "archive", conversationId: activeConvId });
   }, [activeConvId, send]);
+
+  const handlePermissionModeChange = useCallback(
+    async (mode: string) => {
+      if (!activeConvId || !token) return;
+      const res = await fetch(`/api/conversations/${activeConvId}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ permission_mode: mode }),
+      });
+      if (res.ok) fetchConversations();
+    },
+    [activeConvId, token, fetchConversations]
+  );
 
   const handlePermissionResponse = useCallback(
     (permissionId: string, approved: boolean) => {
@@ -171,6 +190,7 @@ export function ChatPage({
         onSelect={handleSelect}
         onCreate={handleNewClick}
         onDelete={handleDelete}
+        onRename={renameConversation}
         loading={convsLoading}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -194,6 +214,7 @@ export function ChatPage({
         onArchive={handleArchive}
         onPermissionResponse={handlePermissionResponse}
         onUserInputResponse={handleUserInputResponse}
+        onPermissionModeChange={handlePermissionModeChange}
         connected={connected}
         status={status}
         isQuerying={activeQuery === activeConvId}

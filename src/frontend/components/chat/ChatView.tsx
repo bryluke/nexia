@@ -16,6 +16,7 @@ interface Props {
     requestId: string,
     answers: Record<string, string>
   ) => void;
+  onPermissionModeChange?: (mode: string) => void;
   connected: boolean;
   status: string | null;
   isQuerying: boolean;
@@ -30,6 +31,7 @@ export function ChatView({
   onArchive,
   onPermissionResponse,
   onUserInputResponse,
+  onPermissionModeChange,
   connected,
   status,
   isQuerying,
@@ -89,6 +91,20 @@ export function ChatView({
             )}
           </div>
         </div>
+        {!isArchived && onPermissionModeChange && (
+          <select
+            class="perm-mode-select"
+            value={conversation?.permission_mode || "acceptEdits"}
+            onChange={(e) =>
+              onPermissionModeChange((e.target as HTMLSelectElement).value)
+            }
+            title="Permission mode"
+          >
+            <option value="acceptEdits">Accept Edits</option>
+            <option value="default">Ask All</option>
+            <option value="bypassPermissions">Bypass All</option>
+          </select>
+        )}
         {isArchived ? (
           <span class="archived-badge">Archived</span>
         ) : (
