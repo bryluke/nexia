@@ -1,73 +1,73 @@
 # Nexia v2 — Roadmap
 
 Written: 2026-03-22
+Updated: 2026-03-23
 Status: Living document.
 
 ---
 
-## Where We Can Do Better (from tofucode analysis + pilot testing)
+## Completed
 
-### UX Gaps (High Impact)
+### Phase 1: v2 Rebuild (2026-03-22)
 
-1. **Tool grouping** — Individual tool cards clutter the chat. Need collapsible groups with summary headers.
-2. **Message queue** — Can't send follow-up messages while a query is running. Need a queue with visible status.
-3. **Turn-based pagination** — Loading all messages for a long conversation is slow. Load last 3 turns, paginate backward.
-4. **Context compaction indicator** — Users don't know when/why Claude "forgot" earlier context.
-5. **Model badge** — Show which model generated each response.
+Full rewrite from scratch. Old prototype archived to `v1-archive` branch.
 
-### Robustness Gaps
+- Decomposed architecture (engine, session-store, stream-parser, system-prompt)
+- SQLite with conversations, messages, memory tables + migration runner
+- Top nav + hash router, vanilla CSS with `--nx-` tokens
+- Chat with streaming, tool cards, permission cards, thinking blocks
+- Machine dashboard with system info
+- Memory system with summarization on archive
 
-6. **Error recovery** — Unhandled errors in the agent engine crash the entire server process. Need try/catch at the query iteration level that sends error to the client without killing the server.
-7. **Reconnection state** — When the WS reconnects, the client doesn't know the current state of an in-progress query. Need a state sync mechanism.
-8. **Stale tool cards** — Race condition where tool_use_result arrives before the tool card is rendered (state batching). The Nexia-via-Nexia session already patched this with `resolvedToolsRef`.
+### Phase 2A: Chat Polish (2026-03-22)
 
-### Feature Gaps
+| # | Item | Status |
+|---|------|--------|
+| 1 | Tool grouping (collapsible ToolGroup for consecutive tools) | Done |
+| 2 | Message queue (up to 20 queued, auto-process on result) | Done |
+| 3 | Error recovery (catch in WS handler, global unhandled rejection) | Done |
+| 4 | Directory picker for new conversations | Done |
+| 5 | Context compaction indicator (scissors divider) | Done |
+| 6 | Model badge on responses (Opus/Sonnet/Haiku pill) | Done |
 
-9. **Per-conversation cwd picker** — v2 creates conversations with `homedir()` default. Need a directory picker like v1 had.
-10. **Conversation search/rename** — Can't find old conversations or rename them.
-11. **Permission mode selector** — Currently hardcoded to `acceptEdits`. Should be selectable per conversation.
+Also done by Nexia-via-Nexia session:
+- Mobile responsive sidebar (slide-out with overlay)
+- Scroll-to-bottom button
+- Topbar tooltip (hover to see full title/cwd)
+- Tool result race fix (resolvedToolsRef)
+- `user` message type handling for tool_result
 
-### Architecture Gaps
+### Phase 2B: Conversations & Memory (2026-03-23)
 
-12. **No tests** — Zero test coverage. At minimum, need DB query tests and WS protocol tests.
-13. **Frontend build optimization** — Bun's HTML imports work but don't tree-shake or minify. Fine for now, but may matter at scale.
+| # | Item | Status |
+|---|------|--------|
+| 8 | Conversation search (client-side filter by title/cwd) | Done |
+| 9 | Conversation rename (double-click inline edit + PATCH API) | Done |
+| 10 | Permission mode selector (per-conversation dropdown, DB column) | Done |
+| 11 | Memory viewer page (#/memory route, filter/search/delete) | Done |
 
 ---
 
-## Execution Plan
-
-### Phase 2A: Chat Polish (Next)
-
-Priority: Fix the UX issues that make daily use frustrating.
-
-| # | Item | Effort | Files |
-|---|------|--------|-------|
-| 1 | Tool grouping | Medium | New `ToolGroup.tsx`, update `MessageBubble.tsx` |
-| 2 | Message queue | Low | `session-store.ts`, `engine.ts`, `handler.ts`, new queue UI component |
-| 3 | Error recovery (don't crash server) | Low | `engine.ts` — wrap query iteration in try/catch |
-| 4 | Directory picker for new conversations | Medium | New `DirectoryPicker.tsx` (port from v1), update `ChatPage.tsx` |
-| 5 | Context compaction indicator | Low | `stream-parser.ts`, new `CompactionDivider.tsx` |
-| 6 | Model badge on responses | Low | `stream-parser.ts`, `MessageBubble.tsx` |
-
-### Phase 2B: Conversations & Memory
-
-Priority: Make the conversation and memory systems actually useful.
-
-| # | Item | Effort | Files |
-|---|------|--------|-------|
-| 7 | Turn-based pagination | Medium | New API endpoint, `useChat.ts`, `ChatView.tsx` |
-| 8 | Conversation search | Low | New search input in `ConversationList.tsx`, filter client-side |
-| 9 | Conversation rename | Low | New API endpoint, inline edit in `ConversationList.tsx` |
-| 10 | Permission mode selector | Low | UI dropdown per conversation, pass to `engine.ts` |
-| 11 | Memory viewer page | Medium | New `#/memory` route and page to browse/search/delete memories |
+## Up Next
 
 ### Phase 2C: Reliability & Polish
 
-| # | Item | Effort | Files |
+| # | Item | Effort | Notes |
 |---|------|--------|-------|
+| 7 | Turn-based pagination | Medium | Load last 3 turns, paginate backward. Deferred from 2B. |
 | 12 | WS reconnection state sync | Medium | Server sends current query state on WS open |
-| 13 | DB query tests | Medium | New test files with bun:test |
+| 13 | DB query tests | Medium | bun:test for queries, migrations, API endpoints |
 | 14 | `@bryanluketan/ui` integration | Medium | Replace raw HTML elements with ui components |
+
+### Phase 3: Ideas (from usage)
+
+_Add items here as friction points and ideas emerge from daily use._
+
+- Conversation export (markdown/JSON)
+- Memory tagging (add/edit tags from the viewer)
+- Conversation pinning (pin important conversations to top)
+- Cost tracking dashboard (aggregate spend across conversations)
+- Keyboard shortcuts legend in nav
 
 ### Not Planned (Deliberately)
 
