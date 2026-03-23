@@ -1,6 +1,6 @@
 interface Props {
   route: string;
-  onNavigate: (to: "chat" | "dashboard" | "memory") => void;
+  onNavigate: (to: "chat" | "dashboard" | "memory" | "help") => void;
   connected: boolean;
   onLogout: () => void;
 }
@@ -33,6 +33,13 @@ export function Nav({ route, onNavigate, connected, onLogout }: Props) {
         </button>
       </div>
       <div class="nav-right">
+        <button
+          class={`nav-help${route === "help" ? " active" : ""}`}
+          onClick={() => onNavigate("help")}
+          title="Help"
+        >
+          ?
+        </button>
         <span
           class={`nav-status-dot ${connected ? "connected" : "disconnected"}`}
           title={connected ? "Connected" : "Disconnected"}

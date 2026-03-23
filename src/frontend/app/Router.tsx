@@ -1,11 +1,12 @@
 import { useState, useEffect } from "preact/hooks";
 
-type Route = "chat" | "dashboard" | "memory";
+type Route = "chat" | "dashboard" | "memory" | "help";
 
 function getRoute(): Route {
   const hash = window.location.hash.replace("#/", "").replace("#", "");
   if (hash === "dashboard") return "dashboard";
   if (hash === "memory") return "memory";
+  if (hash === "help") return "help";
   return "chat";
 }
 

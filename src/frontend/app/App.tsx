@@ -4,6 +4,7 @@ import { Nav } from "../components/layout/Nav.tsx";
 import { ChatPage } from "../pages/ChatPage.tsx";
 import { DashboardPage } from "../pages/DashboardPage.tsx";
 import { MemoryPage } from "../pages/MemoryPage.tsx";
+import { HelpPage } from "../pages/HelpPage.tsx";
 import { useWebSocket } from "../hooks/useWebSocket.ts";
 import { useConversations } from "../hooks/useConversations.ts";
 import { useChat } from "../hooks/useChat.ts";
@@ -151,8 +152,10 @@ export function App() {
           />
         ) : route === "dashboard" ? (
           <DashboardPage token={token} />
-        ) : (
+        ) : route === "memory" ? (
           <MemoryPage token={token} />
+        ) : (
+          <HelpPage />
         )}
       </main>
     </div>
