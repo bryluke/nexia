@@ -30,7 +30,7 @@ export function ChatInput({
 
   const handleSubmit = () => {
     const text = input.trim();
-    if (!text || isQuerying) return;
+    if (!text) return;
     onSend(text);
     setInput("");
     if (textareaRef.current) {
@@ -60,25 +60,34 @@ export function ChatInput({
             }
           }}
           onKeyDown={handleKeyDown}
-          placeholder="Message Nexia..."
+          placeholder={
+            isQuerying ? "Queue a follow-up..." : "Message Nexia..."
+          }
           rows={1}
           class="chat-input"
         />
         {isQuerying ? (
-          <button
-            onClick={onInterrupt}
-            class="btn btn-icon btn-stop"
-            title="Stop"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="currentColor"
+          <div class="input-btn-group">
+            <button
+              onClick={handleSubmit}
+              disabled={!input.trim() || !connected}
+              class="btn btn-icon btn-queue"
+              title="Queue message"
             >
-              <rect x="6" y="6" width="12" height="12" rx="2" />
-            </svg>
-          </button>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+            <button
+              onClick={onInterrupt}
+              class="btn btn-icon btn-stop"
+              title="Stop"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="6" width="12" height="12" rx="2" />
+              </svg>
+            </button>
+          </div>
         ) : (
           <button
             onClick={handleSubmit}
@@ -86,14 +95,7 @@ export function ChatInput({
             class="btn btn-icon btn-send"
             title="Send"
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
             </svg>
           </button>
