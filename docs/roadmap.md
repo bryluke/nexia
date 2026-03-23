@@ -48,16 +48,24 @@ Also done by Nexia-via-Nexia session:
 
 ---
 
+### Phase 2C: Reliability & Polish (2026-03-23)
+
+| # | Item | Status |
+|---|------|--------|
+| 7 | Turn-based pagination (3 turns initial, "Load older" for 5 more) | Done |
+| 12 | WS reconnection state sync (status restore on reconnect) | Done |
+| 13 | DB tests (14 tests: conversations, messages, memory, turns) | Done |
+| 14 | `@bryanluketan/ui` integration | Replaced by internal ui/ component system |
+
+Also done:
+- UI component system (Page, Card, Badge, StatusDot, SearchInput, Collapsible, IconButton, Section)
+- Help page with full usage documentation
+- Cloudflare cache fix (header_down in Caddy)
+- ChatInput queue fix (allow sending during active queries)
+
+---
+
 ## Up Next
-
-### Phase 2C: Reliability & Polish
-
-| # | Item | Effort | Notes |
-|---|------|--------|-------|
-| 7 | Turn-based pagination | Medium | Load last 3 turns, paginate backward. Deferred from 2B. |
-| 12 | WS reconnection state sync | Medium | Server sends current query state on WS open |
-| 13 | DB query tests | Medium | bun:test for queries, migrations, API endpoints |
-| 14 | `@bryanluketan/ui` integration | Medium | Replace raw HTML elements with ui components |
 
 ### Phase 3: Ideas (from usage)
 
