@@ -1,4 +1,9 @@
 import { useState, useEffect, useCallback } from "preact/hooks";
+import { Page } from "../components/ui/Page.tsx";
+import { Card } from "../components/ui/Card.tsx";
+import { Badge } from "../components/ui/Badge.tsx";
+import { SearchInput } from "../components/ui/SearchInput.tsx";
+import { IconButton } from "../components/ui/IconButton.tsx";
 
 interface MemoryItem {
   id: string;
@@ -66,53 +71,37 @@ export function MemoryPage({ token }: Props) {
     [token]
   );
 
-  const handleSearchSubmit = useCallback(
-    (e: Event) => {
-      e.preventDefault();
-      setKindFilter(null);
-      fetchMemories();
-    },
-    [fetchMemories]
-  );
-
   return (
-    <div class="memory-page">
-      <div class="memory-header">
-        <h1>Memory</h1>
-        <span class="memory-count">{memories.length} entries</span>
+    <Page title="Memory" meta={`${memories.length} entries`}>
+      <div style="margin-bottom: 1rem">
+        <SearchInput
+          value={search}
+          onInput={(v) => { setSearch(v); setKindFilter(null); }}
+          onSubmit={fetchMemories}
+          placeholder="Search memories..."
+        />
       </div>
 
-      <div class="memory-controls">
-        <form class="memory-search-form" onSubmit={handleSearchSubmit}>
-          <input
-            type="text"
-            class="memory-search"
-            placeholder="Search memories..."
-            value={search}
-            onInput={(e) => setSearch((e.target as HTMLInputElement).value)}
-          />
-        </form>
-        <div class="memory-filters">
+      <div class="ui-filters" style="margin-bottom: 1.25rem">
+        <button
+          class={`ui-filter-btn${kindFilter === null && !search ? " active" : ""}`}
+          onClick={() => { setKindFilter(null); setSearch(""); }}
+        >
+          All
+        </button>
+        {Object.entries(KIND_LABELS).map(([kind, label]) => (
           <button
-            class={`memory-filter${kindFilter === null && !search ? " active" : ""}`}
-            onClick={() => { setKindFilter(null); setSearch(""); }}
+            key={kind}
+            class={`ui-filter-btn${kindFilter === kind ? " active" : ""}`}
+            onClick={() => { setKindFilter(kind); setSearch(""); }}
+            style={{ "--filter-color": KIND_COLORS[kind] } as any}
           >
-            All
+            {label}
           </button>
-          {Object.entries(KIND_LABELS).map(([kind, label]) => (
-            <button
-              key={kind}
-              class={`memory-filter${kindFilter === kind ? " active" : ""}`}
-              onClick={() => { setKindFilter(kind); setSearch(""); }}
-              style={{ "--filter-color": KIND_COLORS[kind] } as any}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        ))}
       </div>
 
-      <div class="memory-list">
+      <div style="display: flex; flex-direction: column; gap: 0.75rem">
         {loading && (
           <div class="memory-loading">
             <span class="sidebar-spinner" />
@@ -121,42 +110,44 @@ export function MemoryPage({ token }: Props) {
         )}
         {!loading && memories.length === 0 && (
           <div class="memory-empty">
-            {search ? "No memories match your search" : "No memories yet. Archive a conversation to extract memories."}
+            {search
+              ? "No memories match your search"
+              : "No memories yet. Archive a conversation to extract memories."}
           </div>
         )}
         {memories.map((mem) => (
-          <div key={mem.id} class="memory-item">
-            <div class="memory-item-header">
-              <span
-                class="memory-kind-badge"
-                style={{ background: KIND_COLORS[mem.kind] || "var(--nx-text-dim)" }}
-              >
-                {KIND_LABELS[mem.kind] || mem.kind}
-              </span>
+          <Card key={mem.id}>
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem">
+              <Badge
+                label={KIND_LABELS[mem.kind] || mem.kind}
+                color={KIND_COLORS[mem.kind]}
+              />
               <span class="memory-item-date">
                 {new Date(mem.created_at).toLocaleDateString()}
               </span>
-              <button
-                class="memory-item-delete"
-                onClick={() => handleDelete(mem.id)}
-                title="Delete memory"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-              </button>
+              <span style="margin-left: auto">
+                <IconButton
+                  onClick={() => handleDelete(mem.id)}
+                  title="Delete memory"
+                  class="memory-item-delete"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </IconButton>
+              </span>
             </div>
             <div class="memory-item-content">{mem.content}</div>
             {mem.tags && (
               <div class="memory-item-tags">
                 {mem.tags.split(",").map((tag) => (
-                  <span key={tag} class="memory-tag">{tag.trim()}</span>
+                  <Badge key={tag} label={tag.trim()} variant="outline" />
                 ))}
               </div>
             )}
-          </div>
+          </Card>
         ))}
       </div>
-    </div>
+    </Page>
   );
 }
