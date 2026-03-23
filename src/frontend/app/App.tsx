@@ -33,6 +33,8 @@ export function App() {
     updatePermissionStatus,
     updateUserInputStatus,
     loadMessages,
+    loadOlderMessages,
+    paginationMeta,
     clearMessages,
     clearActiveQuery,
     status,
@@ -144,6 +146,8 @@ export function App() {
             updatePermissionStatus={updatePermissionStatus}
             updateUserInputStatus={updateUserInputStatus}
             loadMessages={loadMessages}
+            loadOlderMessages={loadOlderMessages}
+            paginationMeta={paginationMeta}
             clearMessages={clearMessages}
             send={send}
             connected={connected}

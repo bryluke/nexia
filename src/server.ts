@@ -22,7 +22,7 @@ import { handleSystemInfo } from "./api/system.ts";
 import { handleListDirectories } from "./api/directories.ts";
 import { handleListMemory, handleDeleteMemory } from "./api/memory.ts";
 import { handleWsMessage, type WSData } from "./ws/handler.ts";
-import { getActiveQueryIds } from "./agent/session-store.ts";
+import { getActiveQueryIds, getLastStatus } from "./agent/session-store.ts";
 
 const PORT = 5101;
 
@@ -106,6 +106,15 @@ const server = Bun.serve<WSData>({
             conversationIds: activeIds,
           })
         );
+        // Send last known status for each active query
+        for (const id of activeIds) {
+          const status = getLastStatus(id);
+          if (status) {
+            ws.send(
+              JSON.stringify({ type: "status", conversationId: id, status })
+            );
+          }
+        }
       }
     },
     message(ws, message) {

@@ -29,3 +29,11 @@ export const deleteMessages = db.prepare<void, [string]>(
 export const updateMessageCost = db.prepare<void, [number, number, string]>(
   "UPDATE messages SET cost_usd = ?, duration_ms = ? WHERE id = ?"
 );
+
+export const countMessages = db.prepare<{ count: number }, [string]>(
+  "SELECT COUNT(*) as count FROM messages WHERE conversation_id = ?"
+);
+
+export const listMessagesBefore = db.prepare<MessageRow, [string, string, number]>(
+  "SELECT * FROM messages WHERE conversation_id = ? AND created_at < ? ORDER BY created_at ASC LIMIT ?"
+);

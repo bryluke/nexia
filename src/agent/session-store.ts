@@ -6,6 +6,21 @@ import { rmSync, existsSync } from "node:fs";
 // Active SDK queries keyed by conversationId
 const activeQueries = new Map<string, Query>();
 
+// Last known status per conversation (for reconnection sync)
+const lastStatus = new Map<string, string>();
+
+export function setLastStatus(conversationId: string, status: string): void {
+  lastStatus.set(conversationId, status);
+}
+
+export function getLastStatus(conversationId: string): string | undefined {
+  return lastStatus.get(conversationId);
+}
+
+export function clearLastStatus(conversationId: string): void {
+  lastStatus.delete(conversationId);
+}
+
 // Pending permission requests awaiting user approval
 const pendingPermissions = new Map<
   string,

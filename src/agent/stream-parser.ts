@@ -1,5 +1,6 @@
 import type { ServerMessage } from "../ws/protocol.ts";
 import type { ContentBlock } from "../shared/types.ts";
+import { setLastStatus } from "./session-store.ts";
 
 export type SendFn = (msg: ServerMessage) => void;
 
@@ -121,10 +122,12 @@ export class StreamParser {
       });
     }
 
+    const statusText = `Using ${toolName}...`;
+    setLastStatus(convId, statusText);
     this.send({
       type: "status",
       conversationId: convId,
-      status: `Using ${toolName}...`,
+      status: statusText,
     });
   }
 

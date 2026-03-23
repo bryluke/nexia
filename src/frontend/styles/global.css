@@ -505,6 +505,14 @@ input, textarea { font: inherit; }
   z-index: 10;
 }
 .scroll-to-bottom:hover { color: var(--nx-text-primary); background: var(--nx-bg-hover); }
+.load-older-wrap { text-align: center; margin-bottom: 1rem; }
+.load-older-btn {
+  font-size: 0.75rem; color: var(--nx-text-muted); padding: 0.375rem 1rem;
+  border: 1px solid var(--nx-border); border-radius: var(--nx-radius-md);
+  background: var(--nx-bg-secondary); transition: color 0.15s, background 0.15s;
+}
+.load-older-btn:hover { color: var(--nx-text-primary); background: var(--nx-bg-tertiary); }
+
 .messages-empty {
   display: flex; align-items: center; justify-content: center;
   height: 100%; color: var(--nx-text-dim);

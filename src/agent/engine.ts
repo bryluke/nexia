@@ -19,6 +19,7 @@ import {
   cleanupPendingForConversation,
   cleanupSession,
   dequeueMessage,
+  clearLastStatus,
 } from "./session-store.ts";
 import { StreamParser, type SendFn } from "./stream-parser.ts";
 import { buildSystemPrompt } from "./system-prompt.ts";
@@ -267,6 +268,7 @@ export async function startQuery(
     }
   } finally {
     removeActiveQuery(conversationId);
+    clearLastStatus(conversationId);
     touchConversation.run(conversationId);
     cleanupPendingForConversation(conversationId);
 

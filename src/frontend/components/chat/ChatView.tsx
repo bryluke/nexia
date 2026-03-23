@@ -8,6 +8,8 @@ import type { ChatMessageItem, Conversation } from "../../../shared/types.ts";
 
 interface Props {
   messages: ChatMessageItem[];
+  hasMore?: boolean;
+  onLoadOlder?: () => void;
   onSend: (text: string) => void;
   onInterrupt: () => void;
   onArchive: () => void;
@@ -32,6 +34,8 @@ export function ChatView({
   onPermissionResponse,
   onUserInputResponse,
   onPermissionModeChange,
+  hasMore,
+  onLoadOlder,
   connected,
   status,
   isQuerying,
@@ -153,6 +157,13 @@ export function ChatView({
 
       {/* Messages */}
       <div class="messages-area" ref={messagesAreaRef} onScroll={handleScroll}>
+        {hasMore && onLoadOlder && (
+          <div class="load-older-wrap">
+            <button class="load-older-btn" onClick={onLoadOlder}>
+              Load older messages
+            </button>
+          </div>
+        )}
         {messages.length === 0 && !isArchived && (
           <div class="messages-empty">
             <p>Send a message to get started</p>

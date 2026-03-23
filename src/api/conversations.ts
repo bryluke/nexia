@@ -98,5 +98,47 @@ export function handleListMessages(
   if (!authenticateRequest(req)) return json({ error: "Unauthorized" }, 401);
   const conversation = getConversation.get(conversationId);
   if (!conversation) return json({ error: "Not found" }, 404);
-  return json(listMessages.all(conversationId));
+
+  const url = new URL(req.url);
+  const turnsParam = url.searchParams.get("turns");
+
+  // No pagination — return all messages (backward compat)
+  if (!turnsParam) {
+    return json(listMessages.all(conversationId));
+  }
+
+  const turnsRequested = parseInt(turnsParam, 10) || 3;
+  const before = url.searchParams.get("before"); // ISO timestamp
+
+  const allMessages = listMessages.all(conversationId);
+
+  // Group messages into turns (a turn = user message + all responses until next user)
+  const turns: typeof allMessages[] = [];
+  let currentTurn: typeof allMessages = [];
+  for (const msg of allMessages) {
+    if (msg.role === "user" && currentTurn.length > 0) {
+      turns.push(currentTurn);
+      currentTurn = [];
+    }
+    currentTurn.push(msg);
+  }
+  if (currentTurn.length > 0) turns.push(currentTurn);
+
+  // If `before` is specified, only include turns that start before that timestamp
+  let filteredTurns = turns;
+  if (before) {
+    filteredTurns = turns.filter((turn) => turn[0]!.created_at < before);
+  }
+
+  // Take the last N turns
+  const sliced = filteredTurns.slice(-turnsRequested);
+  const messages = sliced.flat();
+
+  return json({
+    messages,
+    totalTurns: turns.length,
+    returnedTurns: sliced.length,
+    hasMore: filteredTurns.length > turnsRequested,
+    oldestTimestamp: sliced.length > 0 ? sliced[0]![0]!.created_at : null,
+  });
 }

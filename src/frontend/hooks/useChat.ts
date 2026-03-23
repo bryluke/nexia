@@ -15,6 +15,9 @@ export function useChat() {
   const [activeQuery, setActiveQuery] = useState<string | null>(null);
   const pendingTextRef = useRef<Record<string, string>>({});
   const pendingThinkingRef = useRef<Record<string, string>>({});
+  const [paginationMeta, setPaginationMeta] = useState<
+    Record<string, { hasMore: boolean; oldestTimestamp: string | null }>
+  >({});
   // Track resolved tool states to survive state batching races
   const resolvedToolsRef = useRef<Map<string, { status: "completed" | "error"; result: string }>>(new Map());
 
@@ -450,59 +453,103 @@ export function useChat() {
     []
   );
 
+  function parseMessages(raw: any[]): ChatMessageItem[] {
+    return raw.map((m) => {
+      let contentBlocks: ContentBlock[] | undefined;
+      if (m.content_blocks) {
+        try {
+          contentBlocks = JSON.parse(m.content_blocks);
+        } catch {
+          // ignore
+        }
+      }
+      if (contentBlocks) {
+        for (let i = 0; i < contentBlocks.length; i++) {
+          const b = contentBlocks[i]!;
+          if (b.type === "tool_use" && b.status === "running") {
+            contentBlocks[i] = { ...b, status: "completed" };
+          }
+          if (b.type === "permission_request" && b.status === "pending") {
+            contentBlocks[i] = { ...b, status: "denied" };
+          }
+          if (b.type === "user_input" && b.status === "pending") {
+            contentBlocks[i] = { ...b, status: "answered" };
+          }
+        }
+      }
+      return {
+        id: m.id,
+        role: m.role as "user" | "assistant",
+        content: m.content,
+        contentBlocks,
+        createdAt: m.created_at,
+      };
+    });
+  }
+
   const loadMessages = useCallback(
     async (conversationId: string, token: string) => {
       if (messagesByConv[conversationId]) return;
       try {
         const res = await fetch(
-          `/api/conversations/${conversationId}/messages`,
+          `/api/conversations/${conversationId}/messages?turns=3`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (!res.ok) return;
-        const msgs: any[] = await res.json();
+        const data = await res.json();
+
+        // Handle both paginated response and legacy array response
+        const msgs = Array.isArray(data) ? data : data.messages;
         setMessagesByConv((prev) => ({
           ...prev,
-          [conversationId]: msgs.map((m) => {
-            let contentBlocks: ContentBlock[] | undefined;
-            if (m.content_blocks) {
-              try {
-                contentBlocks = JSON.parse(m.content_blocks);
-              } catch {
-                // ignore
-              }
-            }
-            // Mark stale running blocks as completed
-            if (contentBlocks) {
-              for (let i = 0; i < contentBlocks.length; i++) {
-                const b = contentBlocks[i]!;
-                if (b.type === "tool_use" && b.status === "running") {
-                  contentBlocks[i] = { ...b, status: "completed" };
-                }
-                if (
-                  b.type === "permission_request" &&
-                  b.status === "pending"
-                ) {
-                  contentBlocks[i] = { ...b, status: "denied" };
-                }
-                if (b.type === "user_input" && b.status === "pending") {
-                  contentBlocks[i] = { ...b, status: "answered" };
-                }
-              }
-            }
-            return {
-              id: m.id,
-              role: m.role as "user" | "assistant",
-              content: m.content,
-              contentBlocks,
-              createdAt: m.created_at,
-            };
-          }),
+          [conversationId]: parseMessages(msgs),
         }));
+        if (!Array.isArray(data)) {
+          setPaginationMeta((prev) => ({
+            ...prev,
+            [conversationId]: {
+              hasMore: data.hasMore,
+              oldestTimestamp: data.oldestTimestamp,
+            },
+          }));
+        }
       } catch {
         // ignore
       }
     },
     [messagesByConv]
+  );
+
+  const loadOlderMessages = useCallback(
+    async (conversationId: string, token: string) => {
+      const meta = paginationMeta[conversationId];
+      if (!meta?.hasMore || !meta.oldestTimestamp) return;
+      try {
+        const res = await fetch(
+          `/api/conversations/${conversationId}/messages?turns=5&before=${encodeURIComponent(meta.oldestTimestamp)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data)) return;
+
+        const olderMsgs = parseMessages(data.messages);
+        setMessagesByConv((prev) => ({
+          ...prev,
+          [conversationId]: [...olderMsgs, ...(prev[conversationId] || [])],
+        }));
+        setPaginationMeta((prev) => ({
+          ...prev,
+          [conversationId]: {
+            hasMore: data.hasMore,
+            oldestTimestamp: data.oldestTimestamp,
+          },
+        }));
+      } catch {
+        // ignore
+      }
+    },
+    [paginationMeta]
   );
 
   const clearMessages = useCallback((conversationId: string) => {
@@ -525,6 +572,8 @@ export function useChat() {
     updatePermissionStatus,
     updateUserInputStatus,
     loadMessages,
+    loadOlderMessages,
+    paginationMeta,
     clearMessages,
     clearActiveQuery,
     status,

@@ -25,6 +25,8 @@ interface Props {
     answers: Record<string, string>
   ) => void;
   loadMessages: (id: string, token: string) => Promise<void>;
+  loadOlderMessages: (id: string, token: string) => Promise<void>;
+  paginationMeta: Record<string, { hasMore: boolean; oldestTimestamp: string | null }>;
   clearMessages: (id: string) => void;
   send: (data: unknown) => void;
   connected: boolean;
@@ -45,6 +47,8 @@ export function ChatPage({
   updatePermissionStatus,
   updateUserInputStatus,
   loadMessages,
+  loadOlderMessages,
+  paginationMeta,
   clearMessages,
   send,
   connected,
@@ -87,6 +91,15 @@ export function ChatPage({
     },
     [activeConvId, deleteConversation, clearMessages]
   );
+
+  const handleLoadOlder = useCallback(() => {
+    if (!activeConvId || !token) return;
+    loadOlderMessages(activeConvId, token);
+  }, [activeConvId, token, loadOlderMessages]);
+
+  const hasMore = activeConvId
+    ? paginationMeta[activeConvId]?.hasMore ?? false
+    : false;
 
   const handleSend = useCallback(
     (text: string) => {
@@ -209,6 +222,8 @@ export function ChatPage({
         </div>
         <ChatView
         messages={getMessages(activeConvId || "")}
+        hasMore={hasMore}
+        onLoadOlder={handleLoadOlder}
         onSend={handleSend}
         onInterrupt={handleInterrupt}
         onArchive={handleArchive}
